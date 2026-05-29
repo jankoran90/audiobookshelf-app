@@ -27,14 +27,23 @@
             v-for="(item, index) in playerQueue"
             :key="index"
             class="flex items-center px-5 py-3 border-b border-white/5 cursor-pointer active:bg-white/5"
-            @click.stop="$eventBus.$emit('play-item', { libraryItemId: item.libraryItemId, episodeId: item.episodeId }); $store.commit('removeFromQueue', index); showQueue = false"
+            @click.stop="$eventBus.$emit('play-item', { libraryItemId: item.libraryItemId, episodeId: item.episodeId }); showQueue = false"
           >
             <div class="flex-1 min-w-0">
               <p class="text-xs text-fg-muted truncate">{{ item.podcastTitle }}</p>
               <p class="text-sm truncate">{{ item.title }}</p>
-              <p class="text-xs text-fg-muted">{{ $elapsedPretty(item.duration) }}</p>
+              <p v-if="item.description" class="text-xs text-fg-muted mt-0.5 queue-item-description" v-html="item.description" />
+              <p class="text-xs text-fg-muted mt-0.5">{{ $elapsedPretty(item.duration) }}</p>
             </div>
-            <button class="ml-3 p-2 text-fg-muted" @click.stop="removeFromQueue(index)">
+            <div class="flex flex-col ml-2 flex-shrink-0">
+              <button v-if="index > 0" class="p-1 text-fg-muted" @click.stop="$store.commit('moveQueueItem', { from: index, to: index - 1 })">
+                <span class="material-symbols text-base leading-none">keyboard_arrow_up</span>
+              </button>
+              <button v-if="index < playerQueue.length - 1" class="p-1 text-fg-muted" @click.stop="$store.commit('moveQueueItem', { from: index, to: index + 1 })">
+                <span class="material-symbols text-base leading-none">keyboard_arrow_down</span>
+              </button>
+            </div>
+            <button class="ml-1 p-2 text-fg-muted flex-shrink-0" @click.stop="removeFromQueue(index)">
               <span class="material-symbols text-xl">close</span>
             </button>
           </div>
@@ -1239,5 +1248,13 @@ export default {
 }
 .fullscreen #playerControls .play-btn .material-symbols {
   font-size: 2.1rem;
+}
+
+.queue-item-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
 }
 </style>

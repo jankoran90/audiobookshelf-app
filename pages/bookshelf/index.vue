@@ -25,6 +25,16 @@
           </div>
         </div>
 
+        <!-- Play All button -->
+        <button
+          v-if="filteredEpisodes.length"
+          class="flex items-center gap-1 h-7 px-2.5 rounded-full bg-success/20 text-success text-xs flex-shrink-0"
+          @click="playAll"
+        >
+          <span class="material-symbols text-sm leading-none">play_arrow</span>
+          <span>Vše</span>
+        </button>
+
         <!-- Podcast filter chips -->
         <div class="flex gap-1.5 overflow-x-auto flex-1 no-scrollbar">
           <button
@@ -139,11 +149,51 @@
     </template>
 
     <!-- backdrop for sort dropdown -->
-    <div v-if="showSortMenu" class="fixed inset-0 z-10" @click="showSortMenu = false" />
+    <div v-if="showSortMenu" class="fixed inset-0 z-[9]" @click="showSortMenu = false" />
+
+    <!-- Playlist picker bottom sheet -->
+    <div v-if="showPlaylistModal" class="fixed inset-0 z-50 flex flex-col justify-end" @click.self="showPlaylistModal = false">
+      <div class="bg-bg border-t border-border rounded-t-2xl max-h-[70vh] flex flex-col">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
+          <div class="min-w-0 flex-1">
+            <p class="text-xs text-fg-muted truncate">{{ playlistEpisode && playlistEpisode.podcastTitle }}</p>
+            <p class="text-sm font-semibold truncate">{{ playlistEpisode && playlistEpisode.title }}</p>
+          </div>
+          <button class="ml-3 p-1 text-fg-muted flex-shrink-0" @click="showPlaylistModal = false">
+            <span class="material-symbols text-2xl">close</span>
+          </button>
+        </div>
+        <div class="overflow-y-auto flex-1">
+          <div v-if="isLoadingPlaylists" class="py-8 flex justify-center">
+            <widgets-loading-spinner />
+          </div>
+          <template v-else>
+            <button
+              v-for="pl in playlists"
+              :key="pl.id"
+              class="w-full flex items-center gap-3 px-5 py-3.5 border-b border-border/50 text-left"
+              @click="addEpisodeToPlaylist(pl)"
+            >
+              <span class="material-symbols text-xl text-fg-muted">queue_music</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm truncate">{{ pl.name }}</p>
+                <p class="text-xs text-fg-muted">{{ pl.items && pl.items.length || 0 }} položek</p>
+              </div>
+            </button>
+            <button class="w-full flex items-center gap-3 px-5 py-3.5 text-success" @click="createNewPlaylist">
+              <span class="material-symbols text-xl">add</span>
+              <p class="text-sm font-semibold">Nový playlist</p>
+            </button>
+          </template>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import { Dialog } from '@capacitor/dialog'
+
 export default {
   data() {
     return {
@@ -173,7 +223,12 @@ export default {
       lastServerFetch: 0,
       lastServerFetchLibraryId: null,
       lastLocalFetch: 0,
-      localLibraryItemsAll: []
+      localLibraryItemsAll: [],
+      // Playlist picker
+      showPlaylistModal: false,
+      playlistEpisode: null,
+      playlists: [],
+      isLoadingPlaylists: false
     }
   },
   computed: {
@@ -281,6 +336,57 @@ export default {
     }
   },
   methods: {
+    // ─── Play All ─────────────────────────────────────────────────────────
+    playAll() {
+      if (!this.filteredEpisodes.length) return
+      const [first, ...rest] = this.filteredEpisodes
+      const toQueue = rest.map((ep) => ({
+        libraryItemId: ep.libraryItemId,
+        episodeId: ep.id,
+        title: ep.title,
+        podcastTitle: ep.podcast?.metadata?.title || '',
+        duration: ep.duration,
+        description: ep.subtitle || ep.description || ''
+      }))
+      this.$store.commit('setQueue', toQueue)
+      this.$eventBus.$emit('play-item', { libraryItemId: first.libraryItemId, episodeId: first.id })
+    },
+    // ─── Playlist picker ──────────────────────────────────────────────────
+    async openPlaylistPicker(episode) {
+      this.playlistEpisode = episode
+      this.showPlaylistModal = true
+      if (!this.playlists.length) await this.fetchPlaylists()
+    },
+    async fetchPlaylists() {
+      this.isLoadingPlaylists = true
+      const data = await this.$nativeHttp.get('/api/playlists').catch(() => null)
+      this.isLoadingPlaylists = false
+      if (data?.playlists) this.playlists = data.playlists
+    },
+    async addEpisodeToPlaylist(playlist) {
+      if (!this.playlistEpisode) return
+      const { libraryItemId, episodeId } = this.playlistEpisode
+      await this.$nativeHttp
+        .post(`/api/playlists/${playlist.id}/batch/add`, { items: [{ libraryItemId, episodeId }] })
+        .then(() => {
+          this.$toast.success(`Přidáno do „${playlist.name}"`, { timeout: 2000 })
+          // Update local item count
+          const pl = this.playlists.find((p) => p.id === playlist.id)
+          if (pl) pl.items = [...(pl.items || []), { libraryItemId, episodeId }]
+        })
+        .catch(() => this.$toast.error('Nepodařilo se přidat do playlistu'))
+      this.showPlaylistModal = false
+    },
+    async createNewPlaylist() {
+      const { value: name, cancelled } = await Dialog.prompt({ title: 'Nový playlist', message: 'Název:' }).catch(() => ({ cancelled: true }))
+      if (cancelled || !name?.trim()) return
+      const data = await this.$nativeHttp
+        .post('/api/playlists', { name: name.trim(), libraryId: this.currentLibraryId })
+        .catch(() => null)
+      if (!data?.id) return this.$toast.error('Nepodařilo se vytvořit playlist')
+      this.playlists.push(data)
+      await this.addEpisodeToPlaylist(data)
+    },
     // ─── Podcast in-progress methods ──────────────────────────────────────
     async loadInProgressEpisodes(page = 0) {
       if (!this.currentLibraryId) return
@@ -426,9 +532,11 @@ export default {
       this.fetchCategories()
     }
     this.$eventBus.$on('library-changed', this.libraryChanged)
+    this.$eventBus.$on('show-add-to-playlist', this.openPlaylistPicker)
   },
   beforeDestroy() {
     this.$eventBus.$off('library-changed', this.libraryChanged)
+    this.$eventBus.$off('show-add-to-playlist', this.openPlaylistPicker)
   }
 }
 </script>

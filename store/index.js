@@ -215,8 +215,21 @@ export const mutations = {
   addToQueue(state, item) {
     state.playerQueue.push(item)
   },
+  setQueue(state, items) {
+    state.playerQueue = items.slice()
+  },
   removeFromQueue(state, index) {
     state.playerQueue.splice(index, 1)
+  },
+  removeFromQueueByEpisode(state, { libraryItemId, episodeId }) {
+    const idx = state.playerQueue.findIndex((i) => i.libraryItemId === libraryItemId && i.episodeId === episodeId)
+    if (idx !== -1) state.playerQueue.splice(idx, 1)
+  },
+  moveQueueItem(state, { from, to }) {
+    const items = state.playerQueue.slice()
+    const [item] = items.splice(from, 1)
+    items.splice(to, 0, item)
+    state.playerQueue = items
   },
   shiftQueue(state) {
     state.playerQueue.shift()

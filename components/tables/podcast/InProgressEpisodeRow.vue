@@ -32,6 +32,13 @@
         <span class="material-symbols text-lg leading-none">add_to_queue</span>
       </button>
 
+      <button
+        class="flex items-center gap-1 h-8 px-3 rounded-full border border-border text-fg-muted text-sm"
+        @click.stop="addToPlaylist"
+      >
+        <span class="material-symbols text-lg leading-none">playlist_add</span>
+      </button>
+
       <ui-read-icon-btn :disabled="isProcessingReadUpdate" :is-read="userIsFinished" borderless class="ml-auto" @click="toggleFinished" />
     </div>
 
@@ -140,9 +147,19 @@ export default {
         episodeId: this.episode.id,
         title: this.episodeTitle,
         podcastTitle: this.podcastTitle,
-        duration: this.episode.duration
+        duration: this.episode.duration,
+        description: this.description
       })
       this.$toast.success('Přidáno do fronty', { timeout: 1500 })
+    },
+    addToPlaylist() {
+      this.$hapticsImpact()
+      this.$eventBus.$emit('show-add-to-playlist', {
+        libraryItemId: this.libraryItemId,
+        episodeId: this.episode.id,
+        title: this.episodeTitle,
+        podcastTitle: this.podcastTitle
+      })
     },
     async toggleFinished() {
       await this.$hapticsImpact()

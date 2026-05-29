@@ -286,8 +286,14 @@ export default {
     skipToNext() {
       const queue = this.$store.state.playerQueue
       if (!queue.length) return
-      const next = queue[0]
-      this.$store.commit('shiftQueue')
+      const session = this.currentPlaybackSession
+      let next = queue[0]
+      if (session) {
+        const idx = queue.findIndex((i) => i.libraryItemId === session.libraryItemId && i.episodeId === session.episodeId)
+        if (idx !== -1 && idx + 1 < queue.length) {
+          next = queue[idx + 1]
+        }
+      }
       this._lastQueueAdvance = Date.now()
       this.$eventBus.$emit('play-item', { libraryItemId: next.libraryItemId, episodeId: next.episodeId })
     },
@@ -299,12 +305,28 @@ export default {
 
       const queue = this.$store.state.playerQueue
       if (!queue.length) return
-      const next = queue[0]
-      this.$store.commit('shiftQueue')
-      this.$eventBus.$emit('play-item', {
-        libraryItemId: next.libraryItemId,
-        episodeId: next.episodeId
-      })
+
+      const session = this.currentPlaybackSession
+      let nextItem = null
+
+      if (session) {
+        const idx = queue.findIndex((i) => i.libraryItemId === session.libraryItemId && i.episodeId === session.episodeId)
+        if (idx !== -1) {
+          // Remove the finished item and play the one that was next in sequence
+          this.$store.commit('removeFromQueueByEpisode', { libraryItemId: session.libraryItemId, episodeId: session.episodeId })
+          const updated = this.$store.state.playerQueue
+          if (idx < updated.length) nextItem = updated[idx]
+        } else {
+          // Currently playing item is not in queue — play first queue item (it hasn't played yet)
+          nextItem = queue[0]
+        }
+      } else {
+        nextItem = queue[0]
+      }
+
+      if (nextItem) {
+        this.$eventBus.$emit('play-item', { libraryItemId: nextItem.libraryItemId, episodeId: nextItem.episodeId })
+      }
     },
     onLocalMediaProgressUpdate(localMediaProgress) {
       console.log('Got local media progress update', localMediaProgress.progress, JSON.stringify(localMediaProgress))
