@@ -127,20 +127,6 @@
             <p class="text-xl font-mono text-success">{{ sleepTimeRemainingPretty }}</p>
           </div>
 
-          <!-- Queue toggle button -->
-          <span
-            class="material-symbols text-3xl cursor-pointer"
-            :class="playerQueue.length ? 'text-fg text-opacity-75' : 'text-fg-muted text-opacity-50'"
-            @click.stop="showQueue = true"
-          >queue_music</span>
-
-          <!-- Skip to next queue item -->
-          <span
-            class="material-symbols text-3xl cursor-pointer"
-            :class="playerQueue.length ? 'text-fg text-opacity-75' : 'text-fg text-opacity-20'"
-            @click.stop="skipNext"
-          >skip_next</span>
-
           <span class="material-symbols text-3xl text-fg cursor-pointer" :class="chapters.length ? 'text-opacity-75' : 'text-opacity-10'" @click="clickChaptersBtn">format_list_bulleted</span>
         </div>
       </div>
@@ -149,7 +135,7 @@
 
       <div id="playerControls" class="absolute right-0 bottom-0 mx-auto" style="max-width: 414px">
         <div class="flex items-center max-w-full" :class="playerSettings.lockUi ? 'justify-center' : 'justify-between'">
-          <span v-show="showFullscreen && !playerSettings.lockUi" class="material-symbols next-icon text-fg cursor-pointer" :class="showLoadingState ? 'text-opacity-10' : 'text-opacity-75'" @click.stop="jumpChapterStart">first_page</span>
+          <span v-show="showFullscreen && !playerSettings.lockUi" class="material-symbols next-icon text-fg cursor-pointer" :class="playerQueue.length && !showLoadingState ? 'text-opacity-75' : 'text-opacity-20'" @click.stop="showQueue = true">queue_music</span>
           <div v-show="!playerSettings.lockUi" class="jump-icon text-fg cursor-pointer flex flex-col items-center" :class="showLoadingState ? 'text-opacity-10' : 'text-opacity-75'" @click.stop="jumpBackwards">
             <span class="material-symbols text-3xl leading-none">replay</span>
             <span v-if="showFullscreen" class="jump-label text-[10px] font-semibold leading-tight">{{ jumpBackwardsLabel }}</span>
@@ -164,7 +150,7 @@
             <span class="material-symbols text-3xl leading-none">forward_media</span>
             <span v-if="showFullscreen" class="jump-label text-[10px] font-semibold leading-tight">{{ jumpForwardLabel }}</span>
           </div>
-          <span v-show="showFullscreen && !playerSettings.lockUi" class="material-symbols next-icon text-fg cursor-pointer" :class="nextChapter && !showLoadingState ? 'text-opacity-75' : 'text-opacity-10'" @click.stop="jumpNextChapter">last_page</span>
+          <span v-show="showFullscreen && !playerSettings.lockUi" class="material-symbols next-icon text-fg cursor-pointer" :class="playerQueue.length && !showLoadingState ? 'text-opacity-75' : 'text-opacity-20'" @click.stop="skipNext">skip_next</span>
           <span v-show="!showFullscreen && !playerSettings.lockUi" class="material-symbols text-fg cursor-pointer" :class="playerQueue.length ? 'text-opacity-75' : 'text-opacity-20'" style="font-size: 1.5rem" @click.stop="showQueue = true">queue_music</span>
         </div>
       </div>
