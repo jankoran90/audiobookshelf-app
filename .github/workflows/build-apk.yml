@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: checkout sources
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # potřebujeme celou historii pro git log changelog
 
       - name: use Node.js 20.x
         uses: actions/setup-node@v3
@@ -45,6 +47,24 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/keystore.jks
 
+      - name: compute version tag
+        id: version
+        run: |
+          # Najde poslední tag tvaru v*.jk.N a inkrementuje N
+          LAST_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-jk\.[0-9]+$' | head -1)
+          if [ -z "$LAST_TAG" ]; then
+            NEW_TAG="v0.13.0-jk.1"
+            LAST_TAG=""
+          else
+            PREFIX=$(echo "$LAST_TAG" | sed 's/-jk\.[0-9]*$//')
+            LAST_NUM=$(echo "$LAST_TAG" | grep -oE '[0-9]+$')
+            NEW_NUM=$((LAST_NUM + 1))
+            NEW_TAG="${PREFIX}-jk.${NEW_NUM}"
+          fi
+          echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
+          echo "last_tag=${LAST_TAG}" >> $GITHUB_OUTPUT
+          echo "New version tag: ${NEW_TAG} (previous: ${LAST_TAG})"
+
       - name: build signed release APK
         run: |
           ./android/gradlew assembleRelease -p android --no-daemon \
@@ -57,11 +77,9 @@ jobs:
         id: apk
         working-directory: android/app/build/outputs/apk/release/
         run: |
-          build="$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)"
-          name="audiobookshelf-${build}.apk"
+          name="audiobookshelf-${{ steps.version.outputs.tag }}.apk"
           mv -v app-release.apk "${name}"
           echo "filename=${name}" >> $GITHUB_OUTPUT
-          echo "tag=jk-${build}" >> $GITHUB_OUTPUT
 
       - name: upload artifact
         uses: actions/upload-artifact@v4
@@ -69,38 +87,59 @@ jobs:
           name: audiobookshelf-apk
           path: android/app/build/outputs/apk/release/*.apk
 
+      - name: generate changelog
+        id: changelog
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          LAST_TAG="${{ steps.version.outputs.last_tag }}"
+          if [ -z "$LAST_TAG" ]; then
+            LOG=$(git log --oneline -20 --pretty="- %s" | head -20)
+          else
+            LOG=$(git log "${LAST_TAG}..HEAD" --pretty="- %s")
+            if [ -z "$LOG" ]; then
+              LOG="- $(git log --oneline -1 --pretty='%s')"
+            fi
+          fi
+          # Escapujeme pro multiline GitHub output
+          EOF_MARKER=$(openssl rand -hex 8)
+          echo "log<<${EOF_MARKER}" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "${EOF_MARKER}" >> $GITHUB_OUTPUT
+
       - name: create GitHub release
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.apk.outputs.tag }}
-          name: ${{ steps.apk.outputs.tag }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
           body: |
-            ## Audiobookshelf Android — fork build
+            ## ${{ steps.version.outputs.tag }}
 
-            **Upstream verze:** v0.13.0-beta
-            **Commit:** ${{ github.sha }}
-            **Větev:** ${{ github.ref_name }}
+            **Upstream:** v0.13.0-beta | **Commit:** `${{ github.sha }}` | **Větev:** `${{ github.ref_name }}`
 
+            ### Changelog
+            ${{ steps.changelog.outputs.log }}
+
+            ---
             ### Co je v tomto forku
 
             #### Homepage — nedoposlouchané epizody
             - Podcast knihovny zobrazují seznam nedoposlouchaných epizod místo výchozí police
             - Řazení: datum vydání / zbývající čas / název podcastu
             - Filtrování: chip buttony pro každý podcast
-            - Tlačítko "Načíst další" pro stránkování
 
-            #### Fronta přehrávání
-            - Tlačítko ➕ na každé epizodě přidá epizodu do fronty
-            - Po skončení epizody se automaticky spustí další z fronty
-            - Tap na stopu ve frontě ji rovnou přehraje
-            - Store: `playerQueue[]` s mutacemi `addToQueue / removeFromQueue / shiftQueue / clearQueue`
+            #### Fronta přehrávání (persistent playlist mode)
+            - `add_to_queue` přidá epizodu do fronty; `playlist_add` přidá do ABS playlistu
+            - Tlačítko **Přehrát vše** přehraje všechny epizody dle aktivního filtru
+            - Položky se z fronty mažou POUZE při 100% přehrání nebo ručním odebrání
+            - Přeskočení (klik na položku, skip_next) fronta neodstraní
+            - Šipky ↑↓ pro přeřazení pořadí ve frontě
+            - Dvouřádkový popis epizody ve frontě
 
             #### Queue panel v přehrávači
             - Tlačítko 🎵 ve fullscreen i mini přehrávači otevře panel fronty
-            - Panel zobrazuje: právě hrající epizodu + seznam dalších v frontě
-            - Přeskočit na další stopu: tlačítko `skip_next` v transport řadě
-            - Základní ovládání (rewind / play-pause / forward / skip) přímo v panelu
+            - Panel: Nyní hraje + seznam Dále s popisem, šipkami a X tlačítkem
+            - `skip_next` přeskočí na další bez mazání fronty
 
             ---
             > ✅ Release APK — podepsáno konzistentním klíčem. Obtainium aktualizace fungují.
