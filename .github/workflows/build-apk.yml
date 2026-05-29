@@ -11,6 +11,9 @@ on:
       - 'ios/**'
       - 'readme.md'
 
+permissions:
+  contents: write
+
 jobs:
   main:
     runs-on: ubuntu-latest
