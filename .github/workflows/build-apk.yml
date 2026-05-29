@@ -10,6 +10,7 @@ on:
     paths-ignore:
       - 'ios/**'
       - 'readme.md'
+
 jobs:
   main:
     runs-on: ubuntu-latest
@@ -41,14 +42,54 @@ jobs:
         run: ./android/gradlew assembleDebug -p android --no-daemon
 
       - name: rename apk
+        id: apk
         working-directory: android/app/build/outputs/apk/debug/
         run: |
           build="$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)"
           name="audiobookshelf-${build}.apk"
           mv -v app-debug.apk "${name}"
+          echo "filename=${name}" >> $GITHUB_OUTPUT
+          echo "tag=jk-${build}" >> $GITHUB_OUTPUT
 
-      - name: upload app
+      - name: upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: audiobookshelf-apk
           path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: create GitHub release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.apk.outputs.tag }}
+          name: ${{ steps.apk.outputs.tag }}
+          body: |
+            ## Audiobookshelf Android — fork build
+
+            **Upstream verze:** v0.13.0-beta
+            **Commit:** ${{ github.sha }}
+            **Větev:** ${{ github.ref_name }}
+
+            ### Co je v tomto forku
+
+            #### Homepage — nedoposlouchané epizody
+            - Podcast knihovny zobrazují seznam nedoposlouchaných epizod místo výchozí police
+            - Řazení: datum vydání / zbývající čas / název podcastu
+            - Filtrování: chip buttony pro každý podcast
+            - Tlačítko "Načíst další" pro stránkování
+
+            #### Fronta přehrávání
+            - Tlačítko ➕ na každé epizodě přidá epizodu do fronty
+            - Po skončení epizody se automaticky spustí další z fronty
+            - Store: `playerQueue[]` s mutacemi `addToQueue / removeFromQueue / shiftQueue / clearQueue`
+
+            #### Queue panel v přehrávači
+            - Ikona 🎵 ve fullscreen přehrávači otevře panel fronty
+            - Panel zobrazuje: právě hrající epizodu + seznam dalších v frontě
+            - Možnost odebrat jednotlivé epizody z fronty
+            - Základní ovládání (rewind / play-pause / forward) přímo v panelu
+
+            ---
+            > ⚠️ Debug APK — není podepsáno release klíčem. Pro instalaci povolte "Neznámé zdroje" v Nastavení.
+          files: android/app/build/outputs/apk/debug/${{ steps.apk.outputs.filename }}
+          make_latest: true
