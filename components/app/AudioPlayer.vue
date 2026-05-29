@@ -62,7 +62,80 @@
             <p class="text-xl font-mono text-success">{{ sleepTimeRemainingPretty }}</p>
           </div>
 
+          <!-- Queue toggle button -->
+          <span
+            class="material-symbols text-3xl cursor-pointer"
+            :class="playerQueue.length ? 'text-fg text-opacity-75' : 'text-fg-muted text-opacity-50'"
+            @click.stop="showQueue = true"
+          >queue_music</span>
+
           <span class="material-symbols text-3xl text-fg cursor-pointer" :class="chapters.length ? 'text-opacity-75' : 'text-opacity-10'" @click="clickChaptersBtn">format_list_bulleted</span>
+        </div>
+      </div>
+
+      <!-- Queue Panel Overlay -->
+      <div v-if="showQueue && showFullscreen" class="absolute inset-0 z-50 bg-bg flex flex-col pointer-events-auto">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-4 border-b border-white/10">
+          <h2 class="text-base font-semibold">Fronta přehrávání</h2>
+          <button @click.stop="showQueue = false">
+            <span class="material-symbols text-2xl text-fg-muted">keyboard_arrow_down</span>
+          </button>
+        </div>
+
+        <!-- Scrollable queue list -->
+        <div class="flex-1 overflow-y-auto">
+          <!-- Currently playing -->
+          <div class="px-5 py-3 bg-white/5">
+            <p class="text-xs text-fg-muted uppercase tracking-wider mb-2">Nyní hraje</p>
+            <div class="flex items-center gap-3">
+              <covers-book-cover v-if="libraryItem || localLibraryItemCoverSrc" :library-item="libraryItem" :download-cover="localLibraryItemCoverSrc" :width="44" :book-cover-aspect-ratio="bookCoverAspectRatio" raw class="rounded overflow-hidden flex-shrink-0" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold truncate">{{ title }}</p>
+                <p class="text-xs text-fg-muted truncate">{{ authorName }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Queue items -->
+          <div v-if="playerQueue.length">
+            <p class="text-xs text-fg-muted uppercase tracking-wider px-5 pt-4 pb-2">Dále ({{ playerQueue.length }})</p>
+            <div
+              v-for="(item, index) in playerQueue"
+              :key="index"
+              class="flex items-center px-5 py-3 border-b border-white/5"
+            >
+              <div class="flex-1 min-w-0">
+                <p class="text-xs text-fg-muted truncate">{{ item.podcastTitle }}</p>
+                <p class="text-sm truncate">{{ item.title }}</p>
+                <p class="text-xs text-fg-muted">{{ $elapsedPretty(item.duration) }}</p>
+              </div>
+              <button class="ml-3 p-1 text-fg-muted" @click.stop="removeFromQueue(index)">
+                <span class="material-symbols text-xl">close</span>
+              </button>
+            </div>
+          </div>
+          <div v-else class="flex flex-col items-center justify-center py-10 text-fg-muted">
+            <span class="material-symbols text-4xl mb-2">queue_music</span>
+            <p class="text-sm">Fronta je prázdná</p>
+          </div>
+        </div>
+
+        <!-- Mini controls -->
+        <div class="px-6 pt-4 pb-8 border-t border-white/10 flex items-center justify-center gap-10">
+          <div class="cursor-pointer text-fg text-opacity-75" @click.stop="jumpBackwards">
+            <span class="material-symbols text-3xl">replay</span>
+          </div>
+          <div
+            class="cursor-pointer flex items-center justify-center rounded-full"
+            style="height: 60px; width: 60px; background-color: rgba(255,255,255,0.15)"
+            @click.stop="playPauseClick"
+          >
+            <span class="material-symbols fill text-3xl">{{ !isPlaying ? 'play_arrow' : 'pause' }}</span>
+          </div>
+          <div class="cursor-pointer text-fg text-opacity-75" @click.stop="jumpForward">
+            <span class="material-symbols text-3xl">forward_media</span>
+          </div>
         </div>
       </div>
       <div v-else class="w-full h-full absolute top-0 left-0 pointer-events-none" style="background: var(--gradient-minimized-audio-player)" />
@@ -159,6 +232,7 @@ export default {
       isLoading: false,
       isCheckingServerProgress: false,
       isDraggingCursor: false,
+      showQueue: false,
       draggingTouchStartX: 0,
       draggingTouchStartTime: 0,
       draggingCurrentTime: 0,
@@ -175,12 +249,16 @@ export default {
       this.updateScreenSize()
       this.$store.commit('setPlayerFullscreen', !!val)
       document.querySelector('body').style.backgroundColor = this.showFullscreen ? this.coverRgb : ''
+      if (!val) this.showQueue = false
     },
     bookCoverAspectRatio() {
       this.updateScreenSize()
     },
     title(val) {
       if (this.titleMarquee) this.titleMarquee.init(val)
+    },
+    isEnded(val) {
+      if (val) this.$eventBus.$emit('playback-ended')
     }
   },
   computed: {
@@ -396,6 +474,9 @@ export default {
       if (!localLibraryItem) return null
 
       return this.playbackSession.localEpisodeId ? `${localLibraryItem.id}-${this.playbackSession.localEpisodeId}` : localLibraryItem.id
+    },
+    playerQueue() {
+      return this.$store.state.playerQueue
     }
   },
   methods: {
@@ -405,6 +486,9 @@ export default {
         message: this.$strings.MessageProgressSyncFailed,
         cancelText: this.$strings.ButtonOk
       })
+    },
+    removeFromQueue(index) {
+      this.$store.commit('removeFromQueue', index)
     },
     clickChaptersBtn() {
       if (!this.chapters.length) return

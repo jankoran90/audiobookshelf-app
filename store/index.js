@@ -27,7 +27,8 @@ export const state = () => ({
   isNetworkListenerInit: false,
   serverSettings: null,
   lastBookshelfScrollData: {},
-  lastItemScrollData: {}
+  lastItemScrollData: {},
+  playerQueue: []
 })
 
 export const getters = {
@@ -210,5 +211,17 @@ export const mutations = {
   setServerSettings(state, val) {
     state.serverSettings = val
     this.$localStore.setServerSettings(state.serverSettings)
+  },
+  addToQueue(state, item) {
+    state.playerQueue.push(item)
+  },
+  removeFromQueue(state, index) {
+    state.playerQueue.splice(index, 1)
+  },
+  shiftQueue(state) {
+    state.playerQueue.shift()
+  },
+  clearQueue(state) {
+    state.playerQueue = []
   }
 }

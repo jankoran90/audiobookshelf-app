@@ -1,0 +1,182 @@
+<template>
+  <div class="w-full py-3 px-4 border-b border-border relative overflow-hidden" @click.stop="goToEpisodePage">
+    <div class="flex items-start gap-3">
+      <div class="w-12 min-w-12">
+        <covers-preview-cover :src="coverSrc" :width="48" :book-cover-aspect-ratio="1" :show-resolution="false" />
+      </div>
+
+      <div class="flex-1 min-w-0">
+        <p class="text-xs text-fg-muted leading-tight truncate">{{ podcastTitle }}</p>
+        <p class="text-sm font-semibold leading-snug mt-0.5 inprogress-title">{{ episodeTitle }}</p>
+        <p class="text-xs text-fg-muted mt-1 inprogress-description" v-html="description" />
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 mt-2.5 pl-1">
+      <button
+        class="flex items-center gap-1 h-8 px-3 rounded-full text-sm font-semibold"
+        :class="streamIsPlaying ? 'bg-white/10 text-fg' : 'bg-success/20 text-success'"
+        @click.stop="playClick"
+      >
+        <span v-if="!playerIsStartingForThisMedia" class="material-symbols fill text-lg leading-none">{{ streamIsPlaying ? 'pause' : 'play_arrow' }}</span>
+        <svg v-else class="animate-spin w-4 h-4" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z" />
+        </svg>
+        <span>{{ timeRemaining }}</span>
+      </button>
+
+      <button
+        class="flex items-center gap-1 h-8 px-3 rounded-full border border-border text-fg-muted text-sm"
+        @click.stop="addToQueue"
+      >
+        <span class="material-symbols text-lg leading-none">add_to_queue</span>
+      </button>
+
+      <ui-read-icon-btn :disabled="isProcessingReadUpdate" :is-read="userIsFinished" borderless class="ml-auto" @click="toggleFinished" />
+    </div>
+
+    <div v-if="itemProgressPercent > 0 && !userIsFinished" class="absolute bottom-0 left-0 h-0.5 bg-warning" :style="{ width: itemProgressPercent * 100 + '%' }" />
+  </div>
+</template>
+
+<script>
+export default {
+  props: {
+    libraryItemId: String,
+    episode: {
+      type: Object,
+      default: () => {}
+    },
+    localLibraryItemId: String,
+    localEpisode: {
+      type: Object,
+      default: () => {}
+    }
+  },
+  data() {
+    return {
+      isProcessingReadUpdate: false
+    }
+  },
+  computed: {
+    podcast() {
+      return this.episode.podcast || {}
+    },
+    podcastTitle() {
+      return this.podcast.metadata?.title || ''
+    },
+    episodeTitle() {
+      return this.episode.title || ''
+    },
+    description() {
+      return this.episode.subtitle || this.episode.description || ''
+    },
+    coverSrc() {
+      return this.$store.getters['globals/getLibraryItemCoverSrcById'](this.libraryItemId)
+    },
+    isStreaming() {
+      return this.$store.getters['getIsMediaStreaming'](this.libraryItemId, this.episode.id)
+    },
+    streamIsPlaying() {
+      return this.$store.state.playerIsPlaying && this.isStreaming
+    },
+    playerIsStartingForThisMedia() {
+      if (!this.episode?.id) return false
+      return this.$store.state.playerStartingPlaybackMediaId === this.episode.id
+    },
+    playerIsStartingPlayback() {
+      return this.$store.state.playerIsStartingPlayback
+    },
+    itemProgress() {
+      if (this.localEpisode && this.localLibraryItemId) {
+        return this.$store.getters['globals/getLocalMediaProgressById'](this.localLibraryItemId, this.localEpisode.id)
+      }
+      return this.$store.getters['user/getUserMediaProgress'](this.libraryItemId, this.episode.id)
+    },
+    itemProgressPercent() {
+      return this.itemProgress?.progress || 0
+    },
+    userIsFinished() {
+      return !!this.itemProgress?.isFinished
+    },
+    timeRemaining() {
+      if (this.streamIsPlaying) return 'Přehrává se'
+      if (!this.itemProgressPercent) return this.$elapsedPretty(this.episode.duration)
+      if (this.userIsFinished) return 'Hotovo'
+      const remaining = Math.floor((this.itemProgress.duration || this.episode.duration) - this.itemProgress.currentTime)
+      return `${this.$elapsedPretty(remaining)} zbývá`
+    }
+  },
+  methods: {
+    goToEpisodePage() {
+      this.$router.push(`/item/${this.libraryItemId}/${this.episode.id}`)
+    },
+    async playClick() {
+      if (this.playerIsStartingPlayback) return
+      await this.$hapticsImpact()
+      if (this.streamIsPlaying) {
+        this.$eventBus.$emit('pause-item')
+      } else {
+        this.$store.commit('setPlayerIsStartingPlayback', this.episode.id)
+        if (this.localEpisode && this.localLibraryItemId) {
+          this.$eventBus.$emit('play-item', {
+            libraryItemId: this.localLibraryItemId,
+            episodeId: this.localEpisode.id,
+            serverLibraryItemId: this.libraryItemId,
+            serverEpisodeId: this.episode.id
+          })
+        } else {
+          this.$eventBus.$emit('play-item', {
+            libraryItemId: this.libraryItemId,
+            episodeId: this.episode.id
+          })
+        }
+      }
+    },
+    addToQueue() {
+      this.$hapticsImpact()
+      this.$eventBus.$emit('add-to-queue', {
+        libraryItemId: this.libraryItemId,
+        episodeId: this.episode.id,
+        title: this.episodeTitle,
+        podcastTitle: this.podcastTitle,
+        duration: this.episode.duration
+      })
+      this.$toast.success('Přidáno do fronty', { timeout: 1500 })
+    },
+    async toggleFinished() {
+      await this.$hapticsImpact()
+      this.isProcessingReadUpdate = true
+      const isFinished = !this.userIsFinished
+      this.$nativeHttp
+        .patch(`/api/me/progress/${this.libraryItemId}/${this.episode.id}`, { isFinished })
+        .then(() => {
+          if (isFinished) this.$emit('markedFinished', this.episode.id)
+        })
+        .catch((error) => {
+          console.error('Failed to toggle finished', error)
+          this.$toast.error('Nepodařilo se označit')
+        })
+        .finally(() => {
+          this.isProcessingReadUpdate = false
+        })
+    }
+  }
+}
+</script>
+
+<style>
+.inprogress-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.inprogress-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+</style>
