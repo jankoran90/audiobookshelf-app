@@ -69,12 +69,19 @@
             @click.stop="showQueue = true"
           >queue_music</span>
 
+          <!-- Skip to next queue item -->
+          <span
+            class="material-symbols text-3xl cursor-pointer"
+            :class="playerQueue.length ? 'text-fg text-opacity-75' : 'text-fg text-opacity-20'"
+            @click.stop="skipNext"
+          >skip_next</span>
+
           <span class="material-symbols text-3xl text-fg cursor-pointer" :class="chapters.length ? 'text-opacity-75' : 'text-opacity-10'" @click="clickChaptersBtn">format_list_bulleted</span>
         </div>
       </div>
 
       <!-- Queue Panel Overlay -->
-      <div v-if="showQueue" class="fixed inset-0 z-[200] bg-bg flex flex-col pointer-events-auto">
+      <div v-if="showQueue" class="fixed inset-0 z-[200] bg-bg text-fg flex flex-col pointer-events-auto">
         <!-- Header -->
         <div class="flex items-center justify-between px-5 py-4 border-b border-white/10">
           <h2 class="text-base font-semibold">Fronta přehrávání</h2>
@@ -122,7 +129,7 @@
         </div>
 
         <!-- Mini controls -->
-        <div class="px-6 pt-4 pb-8 border-t border-white/10 flex items-center justify-center gap-10">
+        <div class="px-6 pt-4 pb-8 border-t border-white/10 flex items-center justify-center gap-8">
           <div class="cursor-pointer text-fg text-opacity-75" @click.stop="jumpBackwards">
             <span class="material-symbols text-3xl">replay</span>
           </div>
@@ -135,6 +142,9 @@
           </div>
           <div class="cursor-pointer text-fg text-opacity-75" @click.stop="jumpForward">
             <span class="material-symbols text-3xl">forward_media</span>
+          </div>
+          <div class="cursor-pointer" :class="playerQueue.length ? 'text-fg text-opacity-75' : 'text-fg text-opacity-20'" @click.stop="skipNext">
+            <span class="material-symbols text-3xl">skip_next</span>
           </div>
         </div>
       </div>
@@ -167,8 +177,8 @@
         class="absolute top-2 right-3 z-10 flex items-center gap-1 cursor-pointer pointer-events-auto"
         @click.stop="showQueue = true"
       >
-        <span class="material-symbols text-xl text-fg-muted leading-none">queue_music</span>
-        <span class="text-xs text-fg-muted">{{ playerQueue.length }}</span>
+        <span class="material-symbols text-xl text-fg leading-none">queue_music</span>
+        <span class="text-xs text-fg font-semibold">{{ playerQueue.length }}</span>
       </div>
 
       <div id="playerTrack" class="absolute left-0 w-full px-6">
@@ -501,6 +511,9 @@ export default {
     },
     removeFromQueue(index) {
       this.$store.commit('removeFromQueue', index)
+    },
+    skipNext() {
+      this.$eventBus.$emit('skip-to-next')
     },
     clickChaptersBtn() {
       if (!this.chapters.length) return

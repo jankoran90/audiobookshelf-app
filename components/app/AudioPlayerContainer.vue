@@ -283,6 +283,14 @@ export default {
     addItemToQueue(item) {
       this.$store.commit('addToQueue', item)
     },
+    skipToNext() {
+      const queue = this.$store.state.playerQueue
+      if (!queue.length) return
+      const next = queue[0]
+      this.$store.commit('shiftQueue')
+      this._lastQueueAdvance = Date.now()
+      this.$eventBus.$emit('play-item', { libraryItemId: next.libraryItemId, episodeId: next.episodeId })
+    },
     onPlaybackEnded() {
       // Guard against rapid-fire ENDED events from the native player during session transitions
       const now = Date.now()
@@ -467,6 +475,7 @@ export default {
     this.$eventBus.$on('pause-item', this.pauseItem)
     this.$eventBus.$on('add-to-queue', this.addItemToQueue)
     this.$eventBus.$on('playback-ended', this.onPlaybackEnded)
+    this.$eventBus.$on('skip-to-next', this.skipToNext)
     this.$eventBus.$on('close-stream', this.closeStreamOnly)
     this.$eventBus.$on('cast-local-item', this.castLocalItem)
     this.$eventBus.$on('user-settings', this.settingsUpdated)
@@ -485,6 +494,7 @@ export default {
     this.$eventBus.$off('pause-item', this.pauseItem)
     this.$eventBus.$off('add-to-queue', this.addItemToQueue)
     this.$eventBus.$off('playback-ended', this.onPlaybackEnded)
+    this.$eventBus.$off('skip-to-next', this.skipToNext)
     this.$eventBus.$off('close-stream', this.closeStreamOnly)
     this.$eventBus.$off('cast-local-item', this.castLocalItem)
     this.$eventBus.$off('user-settings', this.settingsUpdated)
