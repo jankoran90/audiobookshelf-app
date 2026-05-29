@@ -145,6 +145,11 @@
     </div>
 
     <div id="playerContent" class="playerContainer w-full z-20 absolute bottom-0 left-0 right-0 p-2 pointer-events-auto transition-all" :style="{ backgroundColor: showFullscreen ? '' : coverRgb }" @click="clickContainer">
+      <!-- Pocket Casts style thin progress bar at top of mini player -->
+      <div v-if="!showFullscreen && totalDuration > 0" class="absolute top-0 left-0 right-0 h-0.5 bg-white/10 pointer-events-none">
+        <div class="h-full bg-track-cursor transition-none" :style="{ width: (currentTime / totalDuration * 100) + '%' }" />
+      </div>
+
       <div v-if="showFullscreen" class="absolute bottom-4 left-0 right-0 w-full pb-4 pt-2 mx-auto px-6" style="max-width: 414px">
         <div class="flex items-center justify-between pointer-events-auto">
           <span v-if="!isPodcast && serverLibraryItemId && socketConnected" class="material-symbols text-3xl text-fg-muted cursor-pointer" :class="{ fill: bookmarks.length }" @click="$emit('showBookmarks')">bookmark</span>
@@ -188,7 +193,7 @@
       </div>
 
       <div id="playerTrack" class="absolute left-0 w-full px-6">
-        <div class="flex pointer-events-none">
+        <div v-show="showFullscreen" class="flex pointer-events-none">
           <p class="font-mono text-fg" style="font-size: 0.8rem" ref="currentTimestamp">0:00</p>
           <div class="flex-grow" />
           <p class="font-mono text-fg" style="font-size: 0.8rem">{{ timeRemainingPretty }}</p>

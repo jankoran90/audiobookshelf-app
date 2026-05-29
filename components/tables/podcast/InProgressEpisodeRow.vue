@@ -1,20 +1,30 @@
 <template>
-  <div class="w-full py-3 px-4 border-b border-border relative overflow-hidden" @click.stop="goToEpisodePage">
-    <div class="flex items-start gap-3">
-      <div class="w-12 min-w-12">
-        <covers-preview-cover :src="coverSrc" :width="48" :book-cover-aspect-ratio="1" :show-resolution="false" />
+  <div class="mx-3 my-1.5 rounded-2xl overflow-hidden relative bg-secondary active:opacity-80" @click.stop="goToEpisodePage">
+    <!-- Cover + content row -->
+    <div class="flex items-center gap-3 px-3.5 pt-3.5 pb-0">
+      <div class="w-14 min-w-14 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
+        <covers-preview-cover :src="coverSrc" :width="56" :book-cover-aspect-ratio="1" :show-resolution="false" />
       </div>
 
       <div class="flex-1 min-w-0">
-        <p class="text-xs text-fg-muted leading-tight truncate">{{ podcastTitle }}</p>
-        <p class="text-sm font-semibold leading-snug mt-0.5 inprogress-title">{{ episodeTitle }}</p>
-        <p class="text-xs text-fg-muted mt-1 inprogress-description" v-html="description" />
+        <p class="text-sm font-semibold leading-snug inprogress-title">{{ episodeTitle }}</p>
+        <p class="text-xs text-fg-muted mt-0.5 truncate">{{ podcastTitle }}</p>
+
+        <!-- Progress bar with remaining time -->
+        <div v-if="itemProgressPercent > 0 && !userIsFinished" class="mt-2 flex items-center gap-2">
+          <div class="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+            <div class="h-full bg-warning rounded-full transition-all" :style="{ width: itemProgressPercent * 100 + '%' }" />
+          </div>
+          <span class="text-xs text-fg-muted flex-shrink-0 tabular-nums">{{ timeRemaining }}</span>
+        </div>
+        <p v-else class="text-xs text-fg-muted mt-1">{{ timeRemaining }}</p>
       </div>
     </div>
 
-    <div class="flex items-center gap-2 mt-2.5 pl-1">
+    <!-- Action buttons -->
+    <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-3.5">
       <button
-        class="flex items-center gap-1 h-8 px-3 rounded-full text-sm font-semibold"
+        class="flex items-center justify-center gap-1 h-8 px-3 rounded-full text-sm font-semibold flex-shrink-0"
         :class="streamIsPlaying ? 'bg-white/10 text-fg' : 'bg-success/20 text-success'"
         @click.stop="playClick"
       >
@@ -22,18 +32,18 @@
         <svg v-else class="animate-spin w-4 h-4" viewBox="0 0 24 24">
           <path fill="currentColor" d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z" />
         </svg>
-        <span>{{ timeRemaining }}</span>
+        <span v-if="streamIsPlaying">Přehrává se</span>
       </button>
 
       <button
-        class="flex items-center gap-1 h-8 px-3 rounded-full border border-border text-fg-muted text-sm"
+        class="h-8 w-8 flex items-center justify-center rounded-full border border-border text-fg-muted flex-shrink-0"
         @click.stop="addToQueue"
       >
         <span class="material-symbols text-lg leading-none">add_to_queue</span>
       </button>
 
       <button
-        class="flex items-center gap-1 h-8 px-3 rounded-full border border-border text-fg-muted text-sm"
+        class="h-8 w-8 flex items-center justify-center rounded-full border border-border text-fg-muted flex-shrink-0"
         @click.stop="addToPlaylist"
       >
         <span class="material-symbols text-lg leading-none">playlist_add</span>
@@ -41,8 +51,6 @@
 
       <ui-read-icon-btn :disabled="isProcessingReadUpdate" :is-read="userIsFinished" borderless class="ml-auto" @click="toggleFinished" />
     </div>
-
-    <div v-if="itemProgressPercent > 0 && !userIsFinished" class="absolute bottom-0 left-0 h-0.5 bg-warning" :style="{ width: itemProgressPercent * 100 + '%' }" />
   </div>
 </template>
 
@@ -74,9 +82,6 @@ export default {
     },
     episodeTitle() {
       return this.episode.title || ''
-    },
-    description() {
-      return this.episode.subtitle || this.episode.description || ''
     },
     coverSrc() {
       return this.$store.getters['globals/getLibraryItemCoverSrcById'](this.libraryItemId)
@@ -148,7 +153,7 @@ export default {
         title: this.episodeTitle,
         podcastTitle: this.podcastTitle,
         duration: this.episode.duration,
-        description: this.description
+        description: this.episode.subtitle || this.episode.description || ''
       })
       this.$toast.success('Přidáno do fronty', { timeout: 1500 })
     },
@@ -188,12 +193,5 @@ export default {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-.inprogress-description {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.4;
 }
 </style>
