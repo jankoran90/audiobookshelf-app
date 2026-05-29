@@ -1,8 +1,9 @@
 <template>
   <div v-if="playbackSession" id="streamContainer" class="fixed top-0 left-0 layout-wrapper right-0 z-50 pointer-events-none" :class="{ fullscreen: showFullscreen, 'ios-player': $platform === 'ios', 'web-player': $platform === 'web' }">
-    <!-- Queue Panel Overlay — z-40 překryje cover-wrapper (z-30) i playerContent (z-20) -->
+    <!-- Queue Panel Overlay -->
     <div v-if="showQueue" class="fixed inset-0 z-40 bg-bg text-fg flex flex-col pointer-events-auto">
-      <div class="flex items-center justify-between px-5 py-4 border-b border-white/10">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-white/10 flex-shrink-0">
         <h2 class="text-base font-semibold">Fronta přehrávání</h2>
         <button @click.stop="showQueue = false">
           <span class="material-symbols text-2xl text-fg-muted">keyboard_arrow_down</span>
@@ -10,51 +11,73 @@
       </div>
 
       <div class="flex-1 overflow-y-auto">
-        <div class="px-5 py-3 bg-white/5">
+        <!-- Nyní hraje -->
+        <div class="px-4 py-3 bg-white/5 relative overflow-hidden">
           <p class="text-xs text-fg-muted uppercase tracking-wider mb-2">Nyní hraje</p>
           <div class="flex items-center gap-3">
-            <covers-book-cover v-if="libraryItem || localLibraryItemCoverSrc" :library-item="libraryItem" :download-cover="localLibraryItemCoverSrc" :width="44" :book-cover-aspect-ratio="bookCoverAspectRatio" raw class="rounded overflow-hidden flex-shrink-0" />
+            <covers-book-cover v-if="libraryItem || localLibraryItemCoverSrc" :library-item="libraryItem" :download-cover="localLibraryItemCoverSrc" :width="44" :book-cover-aspect-ratio="1" raw class="rounded overflow-hidden flex-shrink-0" />
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold truncate">{{ title }}</p>
+              <p class="text-sm font-semibold leading-tight truncate">{{ title }}</p>
               <p class="text-xs text-fg-muted truncate">{{ authorName }}</p>
             </div>
           </div>
+          <!-- průběh aktuální stopy -->
+          <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-white/10">
+            <div class="h-full bg-warning" :style="{ width: totalDuration > 0 ? (currentTime / totalDuration * 100) + '%' : '0%' }" />
+          </div>
         </div>
 
-        <div v-if="playerQueue.length">
-          <p class="text-xs text-fg-muted uppercase tracking-wider px-5 pt-4 pb-2">Dále ({{ playerQueue.length }})</p>
+        <!-- Dále -->
+        <template v-if="queueItemsForDisplay.length">
+          <div class="flex items-center justify-between px-4 pt-3 pb-1">
+            <p class="text-xs text-fg-muted uppercase tracking-wider">Dále ({{ queueItemsForDisplay.length }})</p>
+            <button class="text-xs text-fg-muted py-1" @click.stop="$store.commit('clearQueue')">Vymazat vše</button>
+          </div>
+
           <div
-            v-for="(item, index) in playerQueue"
-            :key="index"
-            class="flex items-center px-5 py-3 border-b border-white/5 cursor-pointer active:bg-white/5"
-            @click.stop="$eventBus.$emit('play-item', { libraryItemId: item.libraryItemId, episodeId: item.episodeId }); showQueue = false"
+            v-for="item in queueItemsForDisplay"
+            :key="item._queueIndex"
+            class="flex items-center px-3 py-2.5 border-b border-white/5 cursor-pointer active:bg-white/5 relative overflow-hidden"
+            @click.stop="playQueueItem(item)"
           >
-            <div class="flex-1 min-w-0">
-              <p class="text-xs text-fg-muted truncate">{{ item.podcastTitle }}</p>
-              <p class="text-sm truncate">{{ item.title }}</p>
+            <!-- Cover -->
+            <covers-preview-cover :src="getQueueItemCoverSrc(item)" :width="44" :book-cover-aspect-ratio="1" :show-resolution="false" class="rounded flex-shrink-0" />
+
+            <!-- Text -->
+            <div class="flex-1 min-w-0 px-2.5">
+              <p class="text-xs text-fg-muted truncate leading-tight">{{ item.podcastTitle }}</p>
+              <p class="text-sm leading-tight queue-item-title">{{ item.title }}</p>
               <p v-if="item.description" class="text-xs text-fg-muted mt-0.5 queue-item-description" v-html="item.description" />
-              <p class="text-xs text-fg-muted mt-0.5">{{ $elapsedPretty(item.duration) }}</p>
+              <p class="text-xs text-fg-muted mt-0.5">{{ getQueueItemTimeLabel(item) }}</p>
             </div>
-            <div class="flex flex-col ml-2 flex-shrink-0">
-              <button v-if="index > 0" class="p-1 text-fg-muted" @click.stop="$store.commit('moveQueueItem', { from: index, to: index - 1 })">
+
+            <!-- Přeřadit + odebrat -->
+            <div class="flex flex-col items-center flex-shrink-0">
+              <button v-if="item._queueIndex > 0" class="p-1 text-fg-muted" @click.stop="$store.commit('moveQueueItem', { from: item._queueIndex, to: item._queueIndex - 1 })">
                 <span class="material-symbols text-base leading-none">keyboard_arrow_up</span>
               </button>
-              <button v-if="index < playerQueue.length - 1" class="p-1 text-fg-muted" @click.stop="$store.commit('moveQueueItem', { from: index, to: index + 1 })">
+              <button v-if="item._queueIndex < playerQueue.length - 1" class="p-1 text-fg-muted" @click.stop="$store.commit('moveQueueItem', { from: item._queueIndex, to: item._queueIndex + 1 })">
                 <span class="material-symbols text-base leading-none">keyboard_arrow_down</span>
               </button>
             </div>
-            <button class="ml-1 p-2 text-fg-muted flex-shrink-0" @click.stop="removeFromQueue(index)">
+            <button class="p-2 text-fg-muted flex-shrink-0" @click.stop="removeFromQueue(item._queueIndex)">
               <span class="material-symbols text-xl">close</span>
             </button>
+
+            <!-- Progress bar (spodní hrana řádku) -->
+            <div v-if="getQueueItemProgress(item) > 0" class="absolute bottom-0 left-0 h-0.5"
+                 :class="getQueueItemProgress(item) >= 0.95 ? 'bg-success' : 'bg-warning'"
+                 :style="{ width: getQueueItemProgress(item) * 100 + '%' }" />
           </div>
-        </div>
+        </template>
         <div v-else class="flex flex-col items-center justify-center py-10 text-fg-muted">
           <span class="material-symbols text-4xl mb-2">queue_music</span>
           <p class="text-sm">Fronta je prázdná</p>
         </div>
       </div>
 
-      <div class="px-6 pt-4 pb-8 border-t border-white/10 flex items-center justify-center gap-8">
+      <!-- Ovládání -->
+      <div class="px-6 pt-4 pb-8 border-t border-white/10 flex items-center justify-center gap-8 flex-shrink-0">
         <div class="cursor-pointer text-fg text-opacity-75" @click.stop="jumpBackwards">
           <span class="material-symbols text-3xl">replay</span>
         </div>
@@ -68,7 +91,7 @@
         <div class="cursor-pointer text-fg text-opacity-75" @click.stop="jumpForward">
           <span class="material-symbols text-3xl">forward_media</span>
         </div>
-        <div class="cursor-pointer" :class="playerQueue.length ? 'text-fg text-opacity-75' : 'text-fg text-opacity-20'" @click.stop="skipNext">
+        <div class="cursor-pointer" :class="queueItemsForDisplay.length ? 'text-fg text-opacity-75' : 'text-fg text-opacity-20'" @click.stop="skipNext">
           <span class="material-symbols text-3xl">skip_next</span>
         </div>
       </div>
@@ -482,6 +505,15 @@ export default {
     },
     playerQueue() {
       return this.$store.state.playerQueue
+    },
+    queueItemsForDisplay() {
+      const session = this.playbackSession
+      return this.playerQueue
+        .map((item, index) => ({ ...item, _queueIndex: index }))
+        .filter((item) => {
+          if (!session) return true
+          return !(item.libraryItemId === session.libraryItemId && item.episodeId === session.episodeId)
+        })
     }
   },
   methods: {
@@ -494,6 +526,27 @@ export default {
     },
     removeFromQueue(index) {
       this.$store.commit('removeFromQueue', index)
+    },
+    playQueueItem(item) {
+      const progress = this.$store.getters['user/getUserMediaProgress'](item.libraryItemId, item.episodeId)
+      const startTime = progress && !progress.isFinished && progress.currentTime > 0 ? progress.currentTime : undefined
+      this.$eventBus.$emit('play-item', { libraryItemId: item.libraryItemId, episodeId: item.episodeId, startTime })
+      this.showQueue = false
+    },
+    getQueueItemProgress(item) {
+      const p = this.$store.getters['user/getUserMediaProgress'](item.libraryItemId, item.episodeId)
+      return p ? (p.progress || 0) : 0
+    },
+    getQueueItemTimeLabel(item) {
+      const p = this.$store.getters['user/getUserMediaProgress'](item.libraryItemId, item.episodeId)
+      if (p && !p.isFinished && p.currentTime > 0) {
+        const remaining = Math.floor((p.duration || item.duration) - p.currentTime)
+        return this.$elapsedPretty(remaining) + ' zbývá'
+      }
+      return this.$elapsedPretty(item.duration)
+    },
+    getQueueItemCoverSrc(item) {
+      return this.$store.getters['globals/getLibraryItemCoverSrcById'](item.libraryItemId)
     },
     skipNext() {
       this.$eventBus.$emit('skip-to-next')
@@ -1250,6 +1303,12 @@ export default {
   font-size: 2.1rem;
 }
 
+.queue-item-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .queue-item-description {
   display: -webkit-box;
   -webkit-line-clamp: 2;

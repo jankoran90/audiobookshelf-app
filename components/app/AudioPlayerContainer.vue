@@ -193,6 +193,10 @@ export default {
         })
     },
     async playLibraryItem(payload) {
+      // Suppress spurious ENDED events that fire when the native player stops the current
+      // track to start a new one — prevents the old track from being removed from the queue
+      this._lastQueueAdvance = Date.now()
+
       await AbsLogger.info({ tag: 'AudioPlayerContainer', message: `playLibraryItem: Received play request for library item ${payload.libraryItemId} ${payload.episodeId ? `episode ${payload.episodeId}` : ''}` })
       const libraryItemId = payload.libraryItemId
       const episodeId = payload.episodeId
