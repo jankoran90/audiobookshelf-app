@@ -74,7 +74,7 @@
       </div>
 
       <!-- Queue Panel Overlay -->
-      <div v-if="showQueue && showFullscreen" class="absolute inset-0 z-50 bg-bg flex flex-col pointer-events-auto">
+      <div v-if="showQueue" class="fixed inset-0 z-[200] bg-bg flex flex-col pointer-events-auto">
         <!-- Header -->
         <div class="flex items-center justify-between px-5 py-4 border-b border-white/10">
           <h2 class="text-base font-semibold">Fronta přehrávání</h2>
@@ -159,6 +159,16 @@
           </div>
           <span v-show="showFullscreen && !playerSettings.lockUi" class="material-symbols next-icon text-fg cursor-pointer" :class="nextChapter && !showLoadingState ? 'text-opacity-75' : 'text-opacity-10'" @click.stop="jumpNextChapter">last_page</span>
         </div>
+      </div>
+
+      <!-- Mini-player queue button (only when not fullscreen) -->
+      <div
+        v-if="!showFullscreen && playerQueue.length && !playerSettings.lockUi"
+        class="absolute top-2 right-3 z-10 flex items-center gap-1 cursor-pointer pointer-events-auto"
+        @click.stop="showQueue = true"
+      >
+        <span class="material-symbols text-xl text-fg-muted leading-none">queue_music</span>
+        <span class="text-xs text-fg-muted">{{ playerQueue.length }}</span>
       </div>
 
       <div id="playerTrack" class="absolute left-0 w-full px-6">
@@ -249,7 +259,6 @@ export default {
       this.updateScreenSize()
       this.$store.commit('setPlayerFullscreen', !!val)
       document.querySelector('body').style.backgroundColor = this.showFullscreen ? this.coverRgb : ''
-      if (!val) this.showQueue = false
     },
     bookCoverAspectRatio() {
       this.updateScreenSize()
@@ -258,7 +267,10 @@ export default {
       if (this.titleMarquee) this.titleMarquee.init(val)
     },
     isEnded(val) {
-      if (val) this.$eventBus.$emit('playback-ended')
+      if (val && !this._playbackEndedEmitted) {
+        this._playbackEndedEmitted = true
+        this.$eventBus.$emit('playback-ended')
+      }
     }
   },
   computed: {
@@ -877,6 +889,7 @@ export default {
       this.$store.commit('setPlaybackSession', null)
       this.showFullscreen = false
       this.isEnded = false
+      this._playbackEndedEmitted = false
       this.isLoading = false
       this.playbackSession = null
     },
@@ -942,6 +955,7 @@ export default {
       this.playbackSession = playbackSession
 
       this.isEnded = false
+      this._playbackEndedEmitted = false
       this.isLoading = true
       this.syncStatus = 0
       this.$store.commit('setPlaybackSession', this.playbackSession)

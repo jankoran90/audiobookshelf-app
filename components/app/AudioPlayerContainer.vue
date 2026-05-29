@@ -284,6 +284,11 @@ export default {
       this.$store.commit('addToQueue', item)
     },
     onPlaybackEnded() {
+      // Guard against rapid-fire ENDED events from the native player during session transitions
+      const now = Date.now()
+      if (this._lastQueueAdvance && now - this._lastQueueAdvance < 3000) return
+      this._lastQueueAdvance = now
+
       const queue = this.$store.state.playerQueue
       if (!queue.length) return
       const next = queue[0]

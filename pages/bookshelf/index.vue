@@ -76,6 +76,32 @@
         <p class="text-lg font-semibold">Vše poslechnuto!</p>
         <p class="text-sm text-fg-muted mt-1">Žádné nedoposlouchané epizody.</p>
       </div>
+
+      <!-- Queue section -->
+      <div v-if="playerQueue.length" class="mt-2 border-t border-border">
+        <div class="flex items-center justify-between px-4 py-2.5">
+          <p class="text-sm font-semibold flex items-center gap-1.5">
+            <span class="material-symbols text-base leading-none">queue_music</span>
+            Fronta ({{ playerQueue.length }})
+          </p>
+          <button class="text-xs text-fg-muted" @click="clearQueue">Vymazat vše</button>
+        </div>
+        <div
+          v-for="(item, index) in playerQueue"
+          :key="index"
+          class="flex items-center px-4 py-2.5 gap-3 border-b border-border/50"
+        >
+          <span class="text-xs text-fg-muted w-4 text-center flex-shrink-0">{{ index + 1 }}</span>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs text-fg-muted truncate">{{ item.podcastTitle }}</p>
+            <p class="text-sm truncate">{{ item.title }}</p>
+          </div>
+          <p class="text-xs text-fg-muted flex-shrink-0">{{ $elapsedPretty(item.duration) }}</p>
+          <button class="text-fg-muted p-1 flex-shrink-0" @click="removeFromQueue(index)">
+            <span class="material-symbols text-base leading-none">close</span>
+          </button>
+        </div>
+      </div>
     </template>
 
     <!-- NON-PODCAST LIBRARY: original shelf view -->
@@ -205,6 +231,9 @@ export default {
       const names = [...new Set(this.unfinishedEpisodes.map((ep) => ep.podcast?.metadata?.title).filter(Boolean))]
       return names.sort()
     },
+    playerQueue() {
+      return this.$store.state.playerQueue
+    },
     filteredEpisodes() {
       let list = this.unfinishedEpisodes
       if (this.filterPodcast) {
@@ -281,6 +310,12 @@ export default {
     },
     onEpisodeMarkedFinished(episodeId) {
       this.episodes = this.episodes.filter((ep) => ep.id !== episodeId)
+    },
+    removeFromQueue(index) {
+      this.$store.commit('removeFromQueue', index)
+    },
+    clearQueue() {
+      this.$store.commit('clearQueue')
     },
     // ─── Shelf methods (non-podcast) ──────────────────────────────────────
     getShelfLabel(shelf) {
