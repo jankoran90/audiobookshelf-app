@@ -20,6 +20,26 @@
     --gradient-item-page: linear-gradient(169deg, rgba(0, 0, 0, 0.4) 0%, rgba(55, 56, 56, 1) 80%);
     --gradient-audio-player: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(38, 38, 38, 1) 80%);
     --gradient-minimized-audio-player: linear-gradient(145deg, rgba(38, 38, 38, 0.5) 0%, rgba(38, 38, 38, 0.9) 20%, rgb(38, 38, 38) 60%);
+
+    --color-accent: 26 214 145;
+    --color-error: 255 82 82;
+    --color-success: 76 175 80;
+    --color-warning: 251 140 0;
+    --color-info: 33 150 243;
+    --color-shelf-wood: 149 119 90;
+
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.5rem;
+    --radius-full: 9999px;
+
+    --shadow-sm: 0px 3px 6px rgba(17, 17, 17, 0.44);
+    --shadow-md: 2px 8px 6px rgba(17, 17, 17, 0.67);
+    --shadow-lg-up: 0px -12px 8px rgba(17, 17, 17, 0.93);
+    --shadow-xl: 2px 14px 8px rgba(17, 17, 17, 0.67);
+    --shadow-book: 4px 1px 8px rgba(17, 17, 17, 0.40), -4px 1px 8px rgba(17, 17, 17, 0.40), 1px -4px 8px rgba(17, 17, 17, 0.40);
+    --shadow-player: 0px -8px 8px rgba(17, 17, 17, 0.33);
   }
 
   html[data-theme='black'] {
@@ -58,6 +78,15 @@
     --gradient-item-page: linear-gradient(169deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 1) 80%);
     --gradient-audio-player: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 1) 80%);
     --gradient-minimized-audio-player: linear-gradient(145deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.9) 20%, rgb(255, 255, 255) 60%);
+  }
+
+  html[data-theme='kids'] {
+    color: black;
+    --color-bg: 255 248 220;
+    --color-fg: 30 30 30;
+    --color-accent: 255 100 50;
+    --radius-md: 1rem;
+    --radius-lg: 2rem;
   }
 
   body {

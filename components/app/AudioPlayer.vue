@@ -215,14 +215,17 @@
 </template>
 
 <script>
+import { defineComponent } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { AbsAudioPlayer } from '@/plugins/capacitor'
 import { Dialog } from '@capacitor/dialog'
 import { getAverageColorFromCoverUrl } from '@/utils/coverAverageColor'
 import WrappingMarquee from '@/assets/WrappingMarquee.js'
 import jumpLabelMixin from '@/mixins/jumpLabel'
+import { usePlayer } from '~/composables/usePlayer'
+import { useQueue } from '~/composables/useQueue'
 
-export default {
+export default defineComponent({
   props: {
     bookmarks: {
       type: Array,
@@ -233,6 +236,12 @@ export default {
     serverLibraryItemId: String
   },
   mixins: [jumpLabelMixin],
+  setup(_, { root }) {
+    return {
+      ...usePlayer(),
+      ...useQueue(root.$store)
+    }
+  },
   data() {
     return {
       windowHeight: 0,
@@ -240,18 +249,10 @@ export default {
       playbackSession: null,
       showChapterModal: false,
       showFullscreen: false,
-      totalDuration: 0,
-      currentPlaybackRate: 1,
-      currentTime: 0,
-      bufferedTime: 0,
       playInterval: null,
       trackWidth: 0,
-      isPlaying: false,
-      isEnded: false,
-      volume: 0.5,
       readyTrackWidth: 0,
       seekedTime: 0,
-      seekLoading: false,
       touchStartY: 0,
       touchStartTime: 0,
       playerSettings: {
@@ -260,17 +261,12 @@ export default {
         scaleElapsedTimeBySpeed: true,
         lockUi: false
       },
-      isLoading: false,
-      isCheckingServerProgress: false,
       isDraggingCursor: false,
       showQueue: false,
       draggingTouchStartX: 0,
       draggingTouchStartTime: 0,
       draggingCurrentTime: 0,
-      syncStatus: 0,
       showMoreMenuDialog: false,
-      coverRgb: 'rgb(55, 56, 56)',
-      coverBgIsLight: false,
       titleMarquee: null,
       isRefreshingUI: false
     }
@@ -1150,7 +1146,7 @@ export default {
     }
     clearInterval(this.playInterval)
   }
-}
+})
 </script>
 
 <style>

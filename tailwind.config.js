@@ -20,12 +20,28 @@ module.exports = {
         'track-cursor': 'rgb(var(--color-track-cursor) / <alpha-value>)',
         track: 'rgb(var(--color-track) / <alpha-value>)',
         'track-buffered': 'rgb(var(--color-track-buffered) / <alpha-value>)',
-        accent: '#1ad691',
-        error: '#FF5252',
-        info: '#2196F3',
-        success: '#4CAF50',
+        accent: 'rgb(var(--color-accent) / <alpha-value>)',
+        error: 'rgb(var(--color-error) / <alpha-value>)',
+        info: 'rgb(var(--color-info) / <alpha-value>)',
+        success: 'rgb(var(--color-success) / <alpha-value>)',
         successDark: '#3b8a3e',
-        warning: '#FB8C00'
+        warning: 'rgb(var(--color-warning) / <alpha-value>)'
+      },
+      borderRadius: {
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        DEFAULT: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
+        full: 'var(--radius-full)'
+      },
+      boxShadow: {
+        sm: 'var(--shadow-sm)',
+        md: 'var(--shadow-md)',
+        'lg-up': 'var(--shadow-lg-up)',
+        xl: 'var(--shadow-xl)',
+        book: 'var(--shadow-book)',
+        player: 'var(--shadow-player)'
       },
       cursor: {
         none: 'none'
