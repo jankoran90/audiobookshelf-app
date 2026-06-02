@@ -14,6 +14,9 @@ const coverRgb = ref('rgb(55, 56, 56)')
 const coverBgIsLight = ref(false)
 const isEnded = ref(false)
 const syncStatus = ref(0)
+const isVideoItem = ref(false)
+const currentVideoUrl = ref(null)
+const currentVideoMeta = ref(null)
 
 const progress = computed(() => totalDuration.value > 0 ? currentTime.value / totalDuration.value : 0)
 
@@ -43,6 +46,20 @@ export function usePlayer() {
     // AbsAudioPlayer.setVolume(val)
   }
 
+  // YouTube / URL-based playback — Fáze 3 zapojí AbsAudioPlayer.prepareStream()
+  function playUrl(url, meta = {}) {
+    isVideoItem.value = meta.isVideo || false
+    currentVideoUrl.value = url
+    currentVideoMeta.value = meta
+    if (meta.duration) totalDuration.value = meta.duration
+  }
+
+  function clearVideo() {
+    isVideoItem.value = false
+    currentVideoUrl.value = null
+    currentVideoMeta.value = null
+  }
+
   return {
     isPlaying,
     currentTime,
@@ -59,10 +76,15 @@ export function usePlayer() {
     syncStatus,
     progress,
     timeRemaining,
+    isVideoItem,
+    currentVideoUrl,
+    currentVideoMeta,
     play,
     pause,
     seek,
     setRate,
-    setVolume
+    setVolume,
+    playUrl,
+    clearVideo,
   }
 }

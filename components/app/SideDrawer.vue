@@ -87,6 +87,11 @@ export default {
           icon: 'home',
           text: this.$strings.ButtonHome,
           to: '/bookshelf'
+        },
+        {
+          icon: 'smart_display',
+          text: 'YouTube',
+          to: '/youtube'
         }
       ]
       if (!this.serverConnectionConfig) {
