@@ -125,6 +125,24 @@ class LocalStorage {
     }
   }
 
+  async setRemoteThemeUrl(url) {
+    try {
+      await Preferences.set({ key: 'remoteThemeUrl', value: url || '' })
+    } catch (error) {
+      console.error('[LocalStorage] Failed to set remote theme URL', error)
+    }
+  }
+
+  async getRemoteThemeUrl() {
+    try {
+      var obj = await Preferences.get({ key: 'remoteThemeUrl' }) || {}
+      return obj.value || null
+    } catch (error) {
+      console.error('[LocalStorage] Failed to get remote theme URL', error)
+      return null
+    }
+  }
+
   async setLanguage(lang) {
     try {
       await Preferences.set({ key: 'lang', value: lang })

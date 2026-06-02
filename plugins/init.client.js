@@ -281,6 +281,25 @@ export default ({ store, app }, inject) => {
     }
   })
 
+  // Apply remote theme skin if URL is configured
+  app.$localStore?.getRemoteThemeUrl()?.then((url) => {
+    if (!url) return
+    fetch(url)
+      .then((r) => r.json())
+      .then((json) => {
+        let el = document.getElementById('remote-theme')
+        if (!el) {
+          el = document.createElement('style')
+          el.id = 'remote-theme'
+          document.head.appendChild(el)
+        }
+        el.textContent = `:root { ${Object.entries(json)
+          .map(([k, v]) => `${k}:${v}`)
+          .join(';')} }`
+      })
+      .catch((err) => console.warn('[Theme] Remote theme load failed', err))
+  })
+
   // iOS Only
   //  backButton event does not work with iOS swipe navigation so use this workaround
   if (app.router && Capacitor.getPlatform() === 'ios') {

@@ -33,6 +33,14 @@
         <ui-text-input :value="themeOption" readonly append-icon="expand_more" style="max-width: 200px" />
       </div>
     </div>
+    <div class="py-3">
+      <p class="text-sm text-fg-muted mb-1">Remote theme URL</p>
+      <div class="flex items-center gap-2">
+        <ui-text-input v-model="remoteThemeUrl" placeholder="https://example.com/theme.json" style="flex: 1" />
+        <button class="px-3 py-2 bg-accent text-white rounded-md text-sm" @click.stop="saveRemoteThemeUrl">Apply</button>
+      </div>
+      <p class="text-xs text-fg-muted mt-1">JSON with CSS vars: {"--color-bg":"10 10 10"}</p>
+    </div>
 
     <!-- Playback settings -->
     <p class="uppercase text-xs font-semibold text-fg-muted mb-2 mt-10">{{ $strings.HeaderPlaybackSettings }}</p>
@@ -226,6 +234,7 @@ export default {
         androidAutoBrowseSeriesSequenceOrder: 'ASC'
       },
       theme: 'dark',
+      remoteThemeUrl: '',
       lockCurrentOrientation: false,
       settingInfo: {
         disableShakeToResetSleepTimer: {
@@ -382,6 +391,10 @@ export default {
         {
           text: this.$strings.LabelThemeLight,
           value: 'light'
+        },
+        {
+          text: 'Kids',
+          value: 'kids'
         }
       ]
     },
@@ -539,6 +552,30 @@ export default {
       document.documentElement.dataset.theme = theme
       this.$localStore.setTheme(theme)
     },
+    saveRemoteThemeUrl() {
+      const url = this.remoteThemeUrl.trim()
+      this.$localStore.setRemoteThemeUrl(url)
+      if (!url) {
+        const el = document.getElementById('remote-theme')
+        if (el) el.remove()
+        return
+      }
+      fetch(url)
+        .then((r) => r.json())
+        .then((json) => {
+          let el = document.getElementById('remote-theme')
+          if (!el) {
+            el = document.createElement('style')
+            el.id = 'remote-theme'
+            document.head.appendChild(el)
+          }
+          el.textContent = `:root { ${Object.entries(json)
+            .map(([k, v]) => `${k}:${v}`)
+            .join(';')} }`
+          this.$toast.success('Remote theme applied')
+        })
+        .catch(() => this.$toast.error('Failed to load remote theme'))
+    },
     autoSleepTimerTimeUpdated(val) {
       if (!val) return // invalid times return falsy
       this.saveSettings()
@@ -675,6 +712,7 @@ export default {
     async init() {
       this.loading = true
       this.theme = (await this.$localStore.getTheme()) || 'dark'
+      this.remoteThemeUrl = (await this.$localStore.getRemoteThemeUrl()) || ''
       this.deviceData = await this.$db.getDeviceData()
       this.$store.commit('setDeviceData', this.deviceData)
       this.setDeviceSettings()
