@@ -280,6 +280,10 @@ class AbsAudioPlayerWeb extends WebPlugin {
     console.log('[AbsAudioPlayer] downloadVideo (web stub)')
   }
 
+  async installUpdate() {
+    console.log('[AbsAudioPlayer] installUpdate (web stub)')
+  }
+
   setAudioPlayer(playbackSession, playWhenReady = false) {
     if (!this.player) {
       this.initializePlayer()

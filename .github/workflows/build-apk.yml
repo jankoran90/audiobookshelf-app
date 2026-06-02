@@ -21,7 +21,7 @@ jobs:
       - name: checkout sources
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # potřebujeme celou historii pro git log changelog
+          fetch-depth: 0
 
       - name: use Node.js 20.x
         uses: actions/setup-node@v3
@@ -47,23 +47,14 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/keystore.jks
 
-      - name: compute version tag
+      - name: read version from package.json
         id: version
         run: |
-          # Najde poslední tag tvaru v*.jk.N a inkrementuje N
-          LAST_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-jk\.[0-9]+$' | head -1)
-          if [ -z "$LAST_TAG" ]; then
-            NEW_TAG="v0.13.0-jk.1"
-            LAST_TAG=""
-          else
-            PREFIX=$(echo "$LAST_TAG" | sed 's/-jk\.[0-9]*$//')
-            LAST_NUM=$(echo "$LAST_TAG" | grep -oE '[0-9]+$')
-            NEW_NUM=$((LAST_NUM + 1))
-            NEW_TAG="${PREFIX}-jk.${NEW_NUM}"
-          fi
-          echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
-          echo "last_tag=${LAST_TAG}" >> $GITHUB_OUTPUT
-          echo "New version tag: ${NEW_TAG} (previous: ${LAST_TAG})"
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION} → tag: ${TAG}"
 
       - name: build signed release APK
         run: |
@@ -91,22 +82,21 @@ jobs:
         id: changelog
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
-          LAST_TAG="${{ steps.version.outputs.last_tag }}"
-          if [ -z "$LAST_TAG" ]; then
-            LOG=$(git log --oneline -20 --pretty="- %s" | head -20)
+          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]' | sed -n '2p')
+          if [ -z "$PREV_TAG" ]; then
+            LOG=$(git log --oneline -20 --pretty="- %s")
           else
-            LOG=$(git log "${LAST_TAG}..HEAD" --pretty="- %s")
+            LOG=$(git log "${PREV_TAG}..HEAD" --pretty="- %s")
             if [ -z "$LOG" ]; then
               LOG="- $(git log --oneline -1 --pretty='%s')"
             fi
           fi
-          # Escapujeme pro multiline GitHub output
           EOF_MARKER=$(openssl rand -hex 8)
           echo "log<<${EOF_MARKER}" >> $GITHUB_OUTPUT
           echo "$LOG" >> $GITHUB_OUTPUT
           echo "${EOF_MARKER}" >> $GITHUB_OUTPUT
 
-      - name: create GitHub release
+      - name: create or update GitHub release
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
@@ -115,33 +105,35 @@ jobs:
           body: |
             ## ${{ steps.version.outputs.tag }}
 
-            **Upstream:** v0.13.0-beta | **Commit:** `${{ github.sha }}` | **Větev:** `${{ github.ref_name }}`
+            **Commit:** `${{ github.sha }}` | **Větev:** `${{ github.ref_name }}`
 
             ### Changelog
             ${{ steps.changelog.outputs.log }}
 
             ---
-            ### Co je v tomto forku
-
-            #### Homepage — nedoposlouchané epizody
-            - Podcast knihovny zobrazují seznam nedoposlouchaných epizod místo výchozí police
-            - Řazení: datum vydání / zbývající čas / název podcastu
-            - Filtrování: chip buttony pro každý podcast
-
-            #### Fronta přehrávání (persistent playlist mode)
-            - `add_to_queue` přidá epizodu do fronty; `playlist_add` přidá do ABS playlistu
-            - Tlačítko **Přehrát vše** přehraje všechny epizody dle aktivního filtru
-            - Položky se z fronty mažou POUZE při 100% přehrání nebo ručním odebrání
-            - Přeskočení (klik na položku, skip_next) fronta neodstraní
-            - Šipky ↑↓ pro přeřazení pořadí ve frontě
-            - Dvouřádkový popis epizody ve frontě
-
-            #### Queue panel v přehrávači
-            - Tlačítko 🎵 ve fullscreen i mini přehrávači otevře panel fronty
-            - Panel: Nyní hraje + seznam Dále s popisem, šipkami a X tlačítkem
-            - `skip_next` přeskočí na další bez mazání fronty
-
-            ---
-            > ✅ Release APK — podepsáno konzistentním klíčem. Obtainium aktualizace fungují.
+            > ✅ Release APK — podepsáno konzistentním klíčem. In-app aktualizace podporovány.
           files: android/app/build/outputs/apk/release/${{ steps.apk.outputs.filename }}
           make_latest: true
+
+      - name: deploy APK to server
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: jankoran.cz
+          DEPLOY_USER: root
+          DEPLOY_PATH: /root/abs-updates
+          VERSION: ${{ steps.version.outputs.tag }}
+          APK_FILE: android/app/build/outputs/apk/release/${{ steps.apk.outputs.filename }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" "mkdir -p ${DEPLOY_PATH}"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key \
+            "${APK_FILE}" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/audiobookshelf-latest.apk"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "printf '{\"version\":\"%s\",\"apk_url\":\"https://jankoran.cz/abs-updates/audiobookshelf-latest.apk\"}\n' '${VERSION}' > ${DEPLOY_PATH}/latest.json"
+          rm ~/.ssh/deploy_key

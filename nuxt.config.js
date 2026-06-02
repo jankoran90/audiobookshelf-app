@@ -35,7 +35,7 @@ export default {
   components: true,
 
   router: {
-    middleware: ['authenticated', 'skin-guard']
+    middleware: ['skin-guard']
   },
 
   modules: ['@nuxtjs/axios'],

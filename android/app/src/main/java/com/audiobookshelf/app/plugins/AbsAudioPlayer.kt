@@ -1,7 +1,10 @@
 package com.audiobookshelf.app.plugins
 
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Environment
 import android.os.Handler
@@ -9,6 +12,8 @@ import android.os.Looper
 import android.util.Log
 import android.view.TextureView
 import android.view.View
+import androidx.core.content.FileProvider
+import java.io.File
 import com.audiobookshelf.app.MainActivity
 import com.audiobookshelf.app.data.*
 import com.audiobookshelf.app.device.DeviceManager
@@ -503,6 +508,40 @@ class AbsAudioPlayer : Plugin() {
       val dm = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
       dm.enqueue(request)
       call.resolve()
+    }
+  }
+
+  @PluginMethod
+  fun installUpdate(call: PluginCall) {
+    val url = call.getString("url") ?: return call.resolve(JSObject("{\"error\":\"Missing url\"}"))
+    Handler(Looper.getMainLooper()).post {
+      val dm = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+      val destFile = File(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "abs-update.apk")
+      if (destFile.exists()) destFile.delete()
+      val request = DownloadManager.Request(Uri.parse(url))
+        .setTitle("Audiobookshelf update")
+        .setMimeType("application/vnd.android.package-archive")
+        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_DOWNLOADS, "abs-update.apk")
+      val downloadId = dm.enqueue(request)
+      call.resolve(JSObject("{\"started\":true}"))
+
+      val receiver = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+          val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+          if (id != downloadId) return
+          try { activity.unregisterReceiver(this) } catch (_: Exception) {}
+          val file = File(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "abs-update.apk")
+          val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", file)
+          val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            data = uri
+            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+          }
+          activity.startActivity(installIntent)
+        }
+      }
+      @Suppress("UnspecifiedRegisterReceiverFlag")
+      activity.registerReceiver(receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE))
     }
   }
 }

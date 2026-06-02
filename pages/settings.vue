@@ -68,6 +68,31 @@
       <p v-if="remoteUiEnabled" class="text-xs text-yellow-400 mt-2">Po uložení se přepneš do remote frontendu. Lokální UI bude pozastaveno.</p>
     </div>
 
+    <!-- App update -->
+    <div class="py-3 mt-4 border border-border rounded-xl px-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-semibold text-fg">Aktualizace aplikace</p>
+          <p class="text-xs text-fg-muted mt-0.5">Verze {{ appVersion }}</p>
+        </div>
+        <button class="px-3 py-2 bg-accent text-white rounded-md text-sm flex items-center gap-1.5" :disabled="updateChecking" @click.stop="checkForUpdate">
+          <span class="material-symbols text-base leading-none">{{ updateChecking ? 'hourglass_empty' : 'system_update' }}</span>
+          {{ updateChecking ? 'Kontroluji...' : 'Zkontrolovat' }}
+        </button>
+      </div>
+      <div v-if="updateAvailable" class="mt-3 p-3 bg-accent/10 rounded-lg flex items-center justify-between">
+        <div>
+          <p class="text-sm font-semibold text-accent">Dostupná {{ updateAvailable.version }}</p>
+          <p class="text-xs text-fg-muted">Klikni pro stažení a instalaci</p>
+        </div>
+        <button class="px-3 py-2 bg-accent text-white rounded-md text-sm flex items-center gap-1.5" :disabled="updateDownloading" @click.stop="startUpdate">
+          <span class="material-symbols text-base leading-none">download</span>
+          {{ updateDownloading ? 'Stahuji...' : 'Instalovat' }}
+        </button>
+      </div>
+      <p v-if="updateUpToDate" class="text-xs text-fg-muted mt-2">✓ Máš nejnovější verzi.</p>
+    </div>
+
     <!-- Playback settings -->
     <p class="uppercase text-xs font-semibold text-fg-muted mb-2 mt-10">{{ $strings.HeaderPlaybackSettings }}</p>
     <div class="py-3 flex items-center">
@@ -223,6 +248,7 @@
 import { Dialog } from '@capacitor/dialog'
 import jumpLabelMixin from '@/mixins/jumpLabel'
 import { SKINS } from '@/composables/useSkin'
+import { AbsAudioPlayer } from '@/plugins/capacitor'
 
 export default {
   mixins: [jumpLabelMixin],
@@ -231,6 +257,10 @@ export default {
       loading: false,
       deviceData: null,
       showMoreMenuDialog: false,
+      updateChecking: false,
+      updateDownloading: false,
+      updateAvailable: null,
+      updateUpToDate: false,
       showSleepTimerLengthModal: false,
       showAutoSleepTimerRewindLengthModal: false,
       moreMenuSetting: '',
@@ -438,6 +468,9 @@ export default {
     languageOption() {
       return this.languageOptionItems.find((i) => i.value === this.settings.languageCode)?.text || ''
     },
+    appVersion() {
+      return this.$config.version || '?'
+    },
     themeOption() {
       return this.themeOptionItems.find((i) => i.value === this.theme)?.text || ''
     },
@@ -533,6 +566,37 @@ export default {
     showThemeOptions() {
       this.moreMenuSetting = 'theme'
       this.showMoreMenuDialog = true
+    },
+    async checkForUpdate() {
+      this.updateChecking = true
+      this.updateAvailable = null
+      this.updateUpToDate = false
+      try {
+        const data = await this.$nativeHttp.get('https://jankoran.cz/abs-updates/latest.json')
+        const remoteVersion = (data?.version || '').replace(/^v/, '')
+        const current = (this.appVersion || '').replace(/^v/, '')
+        if (remoteVersion && remoteVersion !== current) {
+          this.updateAvailable = data
+        } else {
+          this.updateUpToDate = true
+        }
+      } catch (_) {
+        this.$toast.error('Nepodařilo se zkontrolovat aktualizace', { timeout: 3000 })
+      } finally {
+        this.updateChecking = false
+      }
+    },
+    async startUpdate() {
+      if (!this.updateAvailable?.apk_url) return
+      this.updateDownloading = true
+      try {
+        await AbsAudioPlayer.installUpdate({ url: this.updateAvailable.apk_url })
+        this.$toast.success('Stahování spuštěno — po dokončení se zobrazí instalační dialog', { timeout: 5000 })
+      } catch (_) {
+        this.$toast.error('Chyba při spouštění stahování', { timeout: 3000 })
+      } finally {
+        this.updateDownloading = false
+      }
     },
     showSkinOptions() {
       this.moreMenuSetting = 'skin'
