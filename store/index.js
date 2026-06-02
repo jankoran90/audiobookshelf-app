@@ -1,6 +1,7 @@
 import { Network } from '@capacitor/network'
 import { AbsAudioPlayer } from '@/plugins/capacitor'
 import { PlayMethod } from '@/plugins/constants'
+import { SKINS } from '@/composables/useSkin'
 
 export const state = () => ({
   deviceData: null,
@@ -28,7 +29,8 @@ export const state = () => ({
   serverSettings: null,
   lastBookshelfScrollData: {},
   lastItemScrollData: {},
-  playerQueue: []
+  playerQueue: [],
+  activeSkinId: 'default'
 })
 
 export const getters = {
@@ -100,7 +102,8 @@ export const getters = {
     const majorVersion = parseInt(versionParts[0])
     const minorVersion = parseInt(versionParts[1])
     return majorVersion < 2 || (majorVersion == 2 && minorVersion < 17)
-  }
+  },
+  activeSkin: (state) => SKINS[state.activeSkinId] || SKINS.default
 }
 
 export const actions = {
@@ -236,5 +239,8 @@ export const mutations = {
   },
   clearQueue(state) {
     state.playerQueue = []
+  },
+  SET_ACTIVE_SKIN(state, id) {
+    state.activeSkinId = id
   }
 }

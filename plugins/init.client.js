@@ -281,6 +281,14 @@ export default ({ store, app }, inject) => {
     }
   })
 
+  // Apply saved skin
+  app.$localStore?.getSkinId?.()?.then((skinId) => {
+    if (skinId && skinId !== 'default') {
+      document.documentElement.dataset.skin = skinId
+      store.commit('SET_ACTIVE_SKIN', skinId)
+    }
+  })
+
   // Apply remote theme skin if URL is configured
   app.$localStore?.getRemoteThemeUrl()?.then((url) => {
     if (!url) return

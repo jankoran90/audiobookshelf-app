@@ -1,6 +1,12 @@
 <template>
   <div class="w-full h-full min-h-full relative">
 
+    <!-- KIDS SKIN: simplified bookshelf -->
+    <skins-kids-bookshelf v-if="isKidsSkin" />
+
+    <!-- STANDARD LIBRARY VIEW -->
+    <template v-else>
+
     <!-- PODCAST LIBRARY: in-progress episodes -->
     <template v-if="isPodcastLibrary">
       <!-- Sort & filter toolbar -->
@@ -196,6 +202,7 @@
         </div>
       </div>
     </div>
+    </template><!-- end v-else standard view -->
   </div>
 </template>
 
@@ -241,6 +248,9 @@ export default {
     }
   },
   computed: {
+    isKidsSkin() {
+      return this.$store.state.activeSkinId === 'kids'
+    },
     user() {
       return this.$store.state.user.user
     },

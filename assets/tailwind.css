@@ -89,6 +89,14 @@
     --radius-lg: 2rem;
   }
 
+  html[data-skin='kids'] {
+    --font-size-base: 1.125rem;
+  }
+
+  html[data-skin='kids'] .book-card {
+    min-width: 160px;
+  }
+
   body {
     @apply bg-primary
   }

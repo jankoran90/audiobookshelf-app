@@ -198,6 +198,24 @@ class LocalStorage {
     }
   }
 
+  async setSkinId(id) {
+    try {
+      await Preferences.set({ key: 'skinId', value: id || 'default' })
+    } catch (error) {
+      console.error('[LocalStorage] Failed to set skin ID', error)
+    }
+  }
+
+  async getSkinId() {
+    try {
+      var obj = await Preferences.get({ key: 'skinId' }) || {}
+      return obj.value || 'default'
+    } catch (error) {
+      console.error('[LocalStorage] Failed to get skin ID', error)
+      return 'default'
+    }
+  }
+
   /**
    * Get preference value by key
    * 

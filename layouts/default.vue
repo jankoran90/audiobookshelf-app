@@ -14,7 +14,7 @@
 
     <!-- Lokální Nuxt UI (výchozí) -->
     <template v-else>
-      <app-appbar />
+      <component :is="skinComponents.appbar" />
       <div id="content" class="overflow-hidden relative" :class="isPlayerOpen ? 'playerOpen' : ''">
         <Nuxt :key="currentLang" />
       </div>
@@ -23,7 +23,7 @@
       <modals-playlists-add-create-modal />
       <modals-select-local-folder-modal />
       <modals-rssfeeds-rss-feed-modal />
-      <app-side-drawer :key="currentLang" />
+      <component :is="skinComponents.sideDrawer" :key="currentLang" />
       <readers-reader />
     </template>
   </div>
@@ -98,6 +98,9 @@ export default {
     }
   },
   computed: {
+    skinComponents() {
+      return this.$store.getters['activeSkin'].components
+    },
     isPlayerOpen() {
       return this.$store.getters['getIsPlayerOpen']
     },

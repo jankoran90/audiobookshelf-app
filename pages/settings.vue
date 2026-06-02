@@ -33,6 +33,12 @@
         <ui-text-input :value="themeOption" readonly append-icon="expand_more" style="max-width: 200px" />
       </div>
     </div>
+    <div class="py-3 flex items-center">
+      <p class="pr-4 w-36">Profil UI</p>
+      <div @click.stop="showSkinOptions">
+        <ui-text-input :value="activeSkinLabel" readonly append-icon="expand_more" style="max-width: 200px" />
+      </div>
+    </div>
     <div class="py-3">
       <p class="text-sm text-fg-muted mb-1">Remote theme URL</p>
       <div class="flex items-center gap-2">
@@ -216,6 +222,7 @@
 <script>
 import { Dialog } from '@capacitor/dialog'
 import jumpLabelMixin from '@/mixins/jumpLabel'
+import { SKINS } from '@/composables/useSkin'
 
 export default {
   mixins: [jumpLabelMixin],
@@ -434,6 +441,12 @@ export default {
     themeOption() {
       return this.themeOptionItems.find((i) => i.value === this.theme)?.text || ''
     },
+    skinItems() {
+      return Object.values(SKINS).map((s) => ({ value: s.id, text: s.label }))
+    },
+    activeSkinLabel() {
+      return this.skinItems.find((i) => i.value === this.$store.state.activeSkinId)?.text || 'Výchozí'
+    },
     sleepTimerLengthOption() {
       if (!this.settings.sleepTimerLength) return this.$strings.LabelEndOfChapter
       const minutes = Number(this.settings.sleepTimerLength) / 1000 / 60
@@ -460,6 +473,7 @@ export default {
       else if (this.moreMenuSetting === 'hapticFeedback') return this.hapticFeedbackItems
       else if (this.moreMenuSetting === 'language') return this.languageOptionItems
       else if (this.moreMenuSetting === 'theme') return this.themeOptionItems
+      else if (this.moreMenuSetting === 'skin') return this.skinItems
       else if (this.moreMenuSetting === 'downloadUsingCellular') return this.downloadUsingCellularItems
       else if (this.moreMenuSetting === 'streamingUsingCellular') return this.streamingUsingCellularItems
       else if (this.moreMenuSetting === 'androidAutoBrowseSeriesSequenceOrder') return this.androidAutoBrowseSeriesSequenceOrderItems
@@ -480,6 +494,7 @@ export default {
       if (this.moreMenuSetting === 'jumpBackwards') return this.settings.jumpBackwardsTime
       if (this.moreMenuSetting === 'language') return this.settings.languageCode
       if (this.moreMenuSetting === 'theme') return this.theme
+      if (this.moreMenuSetting === 'skin') return this.$store.state.activeSkinId
       if (this.moreMenuSetting === 'downloadUsingCellular') return this.settings.downloadUsingCellular
       if (this.moreMenuSetting === 'streamingUsingCellular') return this.settings.streamingUsingCellular
       if (this.moreMenuSetting === 'androidAutoBrowseSeriesSequenceOrder') return this.settings.androidAutoBrowseSeriesSequenceOrder
@@ -519,6 +534,17 @@ export default {
       this.moreMenuSetting = 'theme'
       this.showMoreMenuDialog = true
     },
+    showSkinOptions() {
+      this.moreMenuSetting = 'skin'
+      this.showMoreMenuDialog = true
+    },
+    async setSkin(id) {
+      const prev = this.$store.state.activeSkinId
+      document.documentElement.dataset.skin = id === 'default' ? '' : id
+      await this.$localStore.setSkinId(id)
+      this.$store.commit('SET_ACTIVE_SKIN', id)
+      if (id !== prev) window.location.reload()
+    },
     showJumpForwardOptions() {
       this.moreMenuSetting = 'jumpForward'
       this.showMoreMenuDialog = true
@@ -553,6 +579,8 @@ export default {
       } else if (this.moreMenuSetting === 'theme') {
         this.theme = action
         this.saveTheme(action)
+      } else if (this.moreMenuSetting === 'skin') {
+        this.setSkin(action)
       } else if (this.moreMenuSetting === 'downloadUsingCellular') {
         this.settings.downloadUsingCellular = action
         this.saveSettings()
