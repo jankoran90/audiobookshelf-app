@@ -81,6 +81,14 @@
           </button>
         </div>
       </template>
+      <div v-else-if="loadError" class="w-full flex flex-col items-center justify-center py-16 text-center px-8">
+        <span class="material-symbols text-5xl text-error mb-3">wifi_off</span>
+        <p class="text-lg font-semibold">Nepodařilo se načíst</p>
+        <p class="text-sm text-fg-muted mt-1">Zkontroluj připojení k serveru</p>
+        <button class="mt-4 px-4 py-2 rounded-full border border-border text-sm text-fg-muted" @click="loadInProgressEpisodes()">
+          Zkusit znovu
+        </button>
+      </div>
       <div v-else class="w-full flex flex-col items-center justify-center py-16 text-center px-8">
         <span class="material-symbols text-5xl text-fg-muted mb-3">done_all</span>
         <p class="text-lg font-semibold">Vše poslechnuto!</p>
@@ -199,6 +207,7 @@ export default {
     return {
       // Podcast in-progress view
       isLoading: false,
+      loadError: false,
       episodes: [],
       localLibraryItems: [],
       loadedLibraryId: null,
@@ -392,14 +401,18 @@ export default {
       if (!this.currentLibraryId) return
       this.loadedLibraryId = this.currentLibraryId
       this.isLoading = true
+      this.loadError = false
       const payload = await this.$nativeHttp
-        .get(`/api/libraries/${this.currentLibraryId}/recent-episodes?limit=100&page=${page}`)
+        .get(`/api/libraries/${this.currentLibraryId}/recent-episodes?limit=100&page=${page}`, { connectTimeout: 10000, readTimeout: 30000 })
         .catch((error) => {
           console.error('Failed to get recent episodes', error)
           return null
         })
       this.isLoading = false
-      if (!payload) return
+      if (!payload) {
+        this.loadError = true
+        return
+      }
       if (page === 0) {
         this.episodes = payload.episodes || []
       } else {
@@ -513,6 +526,7 @@ export default {
       if (this.isPodcastLibrary) {
         this.episodes = []
         this.filterPodcast = null
+        this.loadError = false
         this.loadInProgressEpisodes()
         this.loadLocalPodcastItems()
       } else {
