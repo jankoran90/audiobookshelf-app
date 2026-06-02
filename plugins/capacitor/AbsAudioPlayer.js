@@ -264,6 +264,22 @@ class AbsAudioPlayerWeb extends WebPlugin {
     this.player.playbackRate = this.playbackRate
   }
 
+  async prepareStream() {
+    console.log('[AbsAudioPlayer] prepareStream (web stub)')
+  }
+
+  async showVideoPlayer() {
+    console.log('[AbsAudioPlayer] showVideoPlayer (web stub)')
+  }
+
+  async hideVideoPlayer() {
+    console.log('[AbsAudioPlayer] hideVideoPlayer (web stub)')
+  }
+
+  async downloadVideo() {
+    console.log('[AbsAudioPlayer] downloadVideo (web stub)')
+  }
+
   setAudioPlayer(playbackSession, playWhenReady = false) {
     if (!this.player) {
       this.initializePlayer()

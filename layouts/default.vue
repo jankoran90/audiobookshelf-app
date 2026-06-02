@@ -1,22 +1,37 @@
 <template>
   <div class="w-full layout-wrapper bg-bg">
-    <app-appbar />
-    <div id="content" class="overflow-hidden relative" :class="isPlayerOpen ? 'playerOpen' : ''">
-      <Nuxt :key="currentLang" />
-    </div>
-    <app-audio-player-container ref="streamContainer" />
-    <modals-libraries-modal />
-    <modals-playlists-add-create-modal />
-    <modals-select-local-folder-modal />
-    <modals-rssfeeds-rss-feed-modal />
-    <app-side-drawer :key="currentLang" />
-    <readers-reader />
+    <!-- Remote UI mode — custom iframe frontend -->
+    <template v-if="remoteUiEnabled && remoteUiUrl">
+      <iframe
+        ref="remoteFrame"
+        :src="remoteUiUrl"
+        class="fixed inset-0 w-full h-full border-0"
+        style="z-index: 10;"
+        allow="autoplay"
+        @load="onRemoteFrameLoad"
+      />
+    </template>
+
+    <!-- Lokální Nuxt UI (výchozí) -->
+    <template v-else>
+      <app-appbar />
+      <div id="content" class="overflow-hidden relative" :class="isPlayerOpen ? 'playerOpen' : ''">
+        <Nuxt :key="currentLang" />
+      </div>
+      <app-audio-player-container ref="streamContainer" />
+      <modals-libraries-modal />
+      <modals-playlists-add-create-modal />
+      <modals-select-local-folder-modal />
+      <modals-rssfeeds-rss-feed-modal />
+      <app-side-drawer :key="currentLang" />
+      <readers-reader />
+    </template>
   </div>
 </template>
 
 <script>
 import { CapacitorHttp } from '@capacitor/core'
-import { AbsLogger } from '@/plugins/capacitor'
+import { AbsAudioPlayer, AbsLogger } from '@/plugins/capacitor'
 
 export default {
   data() {
@@ -26,7 +41,9 @@ export default {
       disconnectTime: 0,
       socketDisconnectedTime: 0,
       timeLostFocus: 0,
-      currentLang: null
+      currentLang: null,
+      remoteUiEnabled: false,
+      remoteUiUrl: '',
     }
   },
   watch: {
@@ -112,6 +129,61 @@ export default {
     }
   },
   methods: {
+    // Remote UI proxy
+    onRemoteFrameLoad() {
+      // remote frontend pošle abs-ready přes postMessage po načtení
+    },
+    forwardEventToRemote(eventName, data) {
+      const frame = this.$refs.remoteFrame
+      if (!frame || !this.remoteUiUrl) return
+      try {
+        frame.contentWindow.postMessage({ type: 'abs-event', event: eventName, data }, new URL(this.remoteUiUrl).origin)
+      } catch (_) {}
+    },
+    handleRemoteMessage(event) {
+      const msg = event.data
+      if (!msg || !event.source || !this.isTrustedOrigin(event.origin)) return
+      if (msg.type === 'abs-ready') {
+        this.sendRemoteAuth(event.source, event.origin)
+      } else if (msg.type === 'abs-call') {
+        this.proxyCapacitorCall(msg).then((result) => {
+          event.source.postMessage({ type: 'abs-result', id: msg.id, data: result }, event.origin)
+        })
+      }
+    },
+    isTrustedOrigin(origin) {
+      if (!this.remoteUiUrl) return false
+      try {
+        return origin === new URL(this.remoteUiUrl).origin
+      } catch (_) {
+        return false
+      }
+    },
+    sendRemoteAuth(target, origin) {
+      target.postMessage(
+        {
+          type: 'abs-auth',
+          token: this.$store.getters['user/getToken'],
+          serverUrl: this.$store.state.user.serverConnectionConfig?.address || null,
+          userId: this.$store.state.user.user?.id || null,
+        },
+        origin
+      )
+    },
+    async proxyCapacitorCall({ plugin, method, args }) {
+      const WHITELIST = {
+        AbsAudioPlayer: ['prepareLibraryItem', 'prepareStream', 'playPlayer', 'pausePlayer', 'playPause', 'seek', 'seekForward', 'seekBackward', 'setPlaybackSpeed', 'showVideoPlayer', 'hideVideoPlayer', 'closePlayback', 'downloadVideo'],
+      }
+      if (!WHITELIST[plugin]?.includes(method)) return { error: 'Not allowed' }
+      const plugins = { AbsAudioPlayer }
+      try {
+        const result = await plugins[plugin][method](args || {})
+        return result || { ok: true }
+      } catch (e) {
+        return { error: e.message }
+      }
+    },
+
     initialStream(stream) {
       if (this.$refs.streamContainer?.audioPlayerReady) {
         this.$refs.streamContainer.streamOpen(stream)
@@ -347,6 +419,20 @@ export default {
     }
   },
   async mounted() {
+    // Remote UI check — musí být první, před socket init
+    const remoteEnabled = await this.$localStore.getRemoteUiEnabled()
+    const remoteUrl = await this.$localStore.getRemoteUiUrl()
+    if (remoteEnabled && remoteUrl) {
+      this.remoteUiEnabled = true
+      this.remoteUiUrl = remoteUrl
+      window.addEventListener('message', this.handleRemoteMessage)
+      // Forward native player events to remote iframe
+      const fwdEvents = ['onPlaybackSession', 'onMetadata', 'onPlayingUpdate', 'onPlaybackClosed', 'onPlaybackFailed', 'onSleepTimerEnded', 'onSleepTimerSet']
+      for (const evt of fwdEvents) {
+        AbsAudioPlayer.addListener(evt, (data) => this.forwardEventToRemote(evt, data))
+      }
+    }
+
     this.$eventBus.$on('change-lang', this.changeLanguage)
     document.addEventListener('visibilitychange', this.visibilityChanged)
 
@@ -383,6 +469,7 @@ export default {
     }
   },
   beforeDestroy() {
+    window.removeEventListener('message', this.handleRemoteMessage)
     this.$eventBus.$off('change-lang', this.changeLanguage)
     document.removeEventListener('visibilitychange', this.visibilityChanged)
     this.$socket.off('user_updated', this.userUpdated)

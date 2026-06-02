@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
+import android.view.TextureView
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.webkit.WebView
@@ -36,6 +37,8 @@ class MainActivity : BridgeActivity() {
 
   lateinit var pluginCallback : () -> Unit
 
+  lateinit var videoSurface: TextureView
+
   val storageHelper = SimpleStorageHelper(this)
   val storage = SimpleStorage(this)
 
@@ -58,6 +61,8 @@ class MainActivity : BridgeActivity() {
 
     // Update the margins to handle edge-to-edge enforced in SDK 35
     // See: https://developer.android.com/develop/ui/views/layout/edge-to-edge
+    videoSurface = findViewById(R.id.videoSurface)
+
     val webView: WebView = findViewById(R.id.webview)
     webView.setOnApplyWindowInsetsListener { v, insets ->
       val (left, top, right, bottom) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

@@ -1,8 +1,14 @@
 package com.audiobookshelf.app.plugins
 
+import android.app.DownloadManager
+import android.content.Context
+import android.net.Uri
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.TextureView
+import android.view.View
 import com.audiobookshelf.app.MainActivity
 import com.audiobookshelf.app.data.*
 import com.audiobookshelf.app.device.DeviceManager
@@ -452,5 +458,51 @@ class AbsAudioPlayer : Plugin() {
     val jsobj = JSObject()
     jsobj.put("value", isCastAvailable)
     call.resolve(jsobj)
+  }
+
+  @PluginMethod
+  fun prepareStream(call: PluginCall) {
+    val url = call.getString("url") ?: return call.resolve(JSObject("{\"error\":\"Missing url\"}"))
+    val title = call.getString("title") ?: ""
+    Handler(Looper.getMainLooper()).post {
+      playerNotificationService.prepareStreamUrl(url, title)
+      call.resolve()
+    }
+  }
+
+  @PluginMethod
+  fun showVideoPlayer(call: PluginCall) {
+    Handler(Looper.getMainLooper()).post {
+      val tv: TextureView = mainActivity.videoSurface
+      playerNotificationService.attachVideoSurface(tv)
+      tv.visibility = View.VISIBLE
+      call.resolve()
+    }
+  }
+
+  @PluginMethod
+  fun hideVideoPlayer(call: PluginCall) {
+    Handler(Looper.getMainLooper()).post {
+      val tv: TextureView = mainActivity.videoSurface
+      playerNotificationService.detachVideoSurface(tv)
+      tv.visibility = View.GONE
+      call.resolve()
+    }
+  }
+
+  @PluginMethod
+  fun downloadVideo(call: PluginCall) {
+    val url = call.getString("url") ?: return call.resolve(JSObject("{\"error\":\"Missing url\"}"))
+    val rawTitle = call.getString("title") ?: "video"
+    val safeTitle = rawTitle.replace(Regex("[/\\\\:*?\"<>|]"), "_").take(100)
+    Handler(Looper.getMainLooper()).post {
+      val request = DownloadManager.Request(Uri.parse(url))
+        .setTitle(safeTitle)
+        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "$safeTitle.mp4")
+        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+      val dm = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+      dm.enqueue(request)
+      call.resolve()
+    }
   }
 }

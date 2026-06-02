@@ -42,6 +42,26 @@
       <p class="text-xs text-fg-muted mt-1">JSON with CSS vars: {"--color-bg":"10 10 10"}</p>
     </div>
 
+    <!-- Remote UI -->
+    <div class="py-3 mt-4 border border-border rounded-xl px-4">
+      <p class="text-sm font-semibold text-fg mb-2">Remote UI</p>
+      <div class="flex items-center justify-between py-1">
+        <p class="text-sm text-fg">Zapnout vzdálené UI</p>
+        <div class="relative w-12 h-6 cursor-pointer" @click.stop="toggleRemoteUi">
+          <div class="absolute inset-0 rounded-full transition-colors" :class="remoteUiEnabled ? 'bg-accent' : 'bg-bg-hover'" />
+          <div class="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform" :class="remoteUiEnabled ? 'translate-x-7' : 'translate-x-1'" />
+        </div>
+      </div>
+      <div class="mt-2">
+        <p class="text-xs text-fg-muted mb-1">URL vzdáleného frontendu</p>
+        <div class="flex items-center gap-2">
+          <ui-text-input v-model="remoteUiUrl" placeholder="https://custom-ui.example.com" style="flex: 1" />
+          <button class="px-3 py-2 bg-accent text-white rounded-md text-sm" @click.stop="saveRemoteUi">Uložit</button>
+        </div>
+      </div>
+      <p v-if="remoteUiEnabled" class="text-xs text-yellow-400 mt-2">Po uložení se přepneš do remote frontendu. Lokální UI bude pozastaveno.</p>
+    </div>
+
     <!-- Playback settings -->
     <p class="uppercase text-xs font-semibold text-fg-muted mb-2 mt-10">{{ $strings.HeaderPlaybackSettings }}</p>
     <div class="py-3 flex items-center">
@@ -235,6 +255,8 @@ export default {
       },
       theme: 'dark',
       remoteThemeUrl: '',
+      remoteUiUrl: '',
+      remoteUiEnabled: false,
       lockCurrentOrientation: false,
       settingInfo: {
         disableShakeToResetSleepTimer: {
@@ -552,6 +574,19 @@ export default {
       document.documentElement.dataset.theme = theme
       this.$localStore.setTheme(theme)
     },
+    async toggleRemoteUi() {
+      this.remoteUiEnabled = !this.remoteUiEnabled
+      await this.$localStore.setRemoteUiEnabled(this.remoteUiEnabled)
+    },
+    async saveRemoteUi() {
+      const url = this.remoteUiUrl.trim()
+      await this.$localStore.setRemoteUiUrl(url)
+      await this.$localStore.setRemoteUiEnabled(this.remoteUiEnabled)
+      this.$toast.success('Remote UI nastavení uloženo', { timeout: 2000 })
+      if (this.remoteUiEnabled && url) {
+        window.location.reload()
+      }
+    },
     saveRemoteThemeUrl() {
       const url = this.remoteThemeUrl.trim()
       this.$localStore.setRemoteThemeUrl(url)
@@ -713,6 +748,8 @@ export default {
       this.loading = true
       this.theme = (await this.$localStore.getTheme()) || 'dark'
       this.remoteThemeUrl = (await this.$localStore.getRemoteThemeUrl()) || ''
+      this.remoteUiUrl = (await this.$localStore.getRemoteUiUrl()) || ''
+      this.remoteUiEnabled = await this.$localStore.getRemoteUiEnabled()
       this.deviceData = await this.$db.getDeviceData()
       this.$store.commit('setDeviceData', this.deviceData)
       this.setDeviceSettings()

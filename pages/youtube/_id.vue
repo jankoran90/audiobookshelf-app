@@ -47,22 +47,27 @@
             <p class="text-sm text-fg leading-snug line-clamp-2">{{ video.title }}</p>
             <p v-if="video.upload_date" class="text-xs text-fg-muted mt-1">{{ formatDate(video.upload_date) }}</p>
           </div>
+          <!-- Download -->
+          <button
+            class="p-1 flex-shrink-0 self-center text-fg-muted active:text-fg"
+            @click.stop="downloadVideoFile(video)"
+          >
+            <span v-if="downloadingId === video.id" class="material-symbols text-xl animate-spin">progress_activity</span>
+            <span v-else class="material-symbols text-xl">download</span>
+          </button>
         </div>
       </div>
     </template>
 
-    <!-- Video player modal (Fáze 2: WebView <video>, Fáze 3: native ExoPlayer) -->
-    <div v-if="activeVideo" class="fixed inset-0 z-[300] bg-black flex flex-col">
-      <!-- Zavřít -->
+    <!-- Video loading overlay (zobrazí se jen při načítání nebo chybě — TextureView překryje zbytek) -->
+    <div v-if="activeVideo && (streamLoading || streamError)" class="fixed inset-0 z-[300] bg-black flex flex-col">
       <div class="flex items-center gap-2 px-3 pt-3 pb-2 flex-shrink-0">
         <button class="p-1" @click="closeVideo">
           <span class="material-symbols text-2xl text-white">keyboard_arrow_down</span>
         </button>
         <p class="text-sm text-white flex-1 truncate">{{ activeVideo.title }}</p>
       </div>
-
-      <!-- Video -->
-      <div class="flex-1 flex items-center justify-center bg-black">
+      <div class="flex-1 flex items-center justify-center">
         <div v-if="streamLoading" class="flex flex-col items-center gap-3 text-white/70">
           <span class="material-symbols text-4xl animate-spin">progress_activity</span>
           <p class="text-sm">Načítám stream…</p>
@@ -72,24 +77,16 @@
           <p class="text-sm text-red-400">{{ streamError }}</p>
           <button class="h-9 px-4 rounded-full bg-white/10 text-sm text-white" @click="fetchStream(activeVideo)">Zkusit znovu</button>
         </div>
-        <!-- Fáze 2: nativní <video> element v WebView -->
-        <!-- Fáze 3: nahradí AbsAudioPlayer.prepareStream() + TextureView overlay -->
-        <video
-          v-else-if="streamUrl"
-          :src="streamUrl"
-          controls
-          autoplay
-          playsinline
-          class="w-full max-h-full"
-          @error="streamError = 'Video se nepodařilo přehrát'"
-        />
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import { App } from '@capacitor/core'
+import { AbsAudioPlayer } from '@/plugins/capacitor'
 import { useYouTube } from '@/composables/useYouTube'
+import { usePlayer } from '@/composables/usePlayer'
 
 const DEFAULT_CHANNELS = [
   {
@@ -102,8 +99,9 @@ const DEFAULT_CHANNELS = [
 
 export default {
   setup() {
-    const { getChannelFeed, getStreamUrl, loading, error } = useYouTube()
-    return { getChannelFeed, getStreamUrl, loading, error }
+    const { getChannelFeed, getStreamUrl, getDownloadUrl, loading, error } = useYouTube()
+    const { playUrl, clearVideo } = usePlayer()
+    return { getChannelFeed, getStreamUrl, getDownloadUrl, loading, error, playUrl, clearVideo }
   },
   data() {
     return {
@@ -112,14 +110,18 @@ export default {
       channelName: '',
       channelThumb: null,
       activeVideo: null,
-      streamUrl: null,
       streamLoading: false,
       streamError: null,
+      backButtonListener: null,
+      downloadingId: null,
     }
   },
   async mounted() {
     this.loadChannel()
     await this.loadFeed()
+  },
+  beforeDestroy() {
+    this.removeBackListener()
   },
   methods: {
     loadChannel() {
@@ -142,7 +144,6 @@ export default {
     },
     async openVideo(video) {
       this.activeVideo = video
-      this.streamUrl = null
       this.streamError = null
       await this.fetchStream(video)
     },
@@ -151,17 +152,49 @@ export default {
       this.streamError = null
       try {
         const stream = await this.getStreamUrl(video.id)
-        this.streamUrl = stream.url
+        await this.playUrl(stream.url, { title: video.title, duration: stream.duration, isVideo: true })
+        await AbsAudioPlayer.showVideoPlayer()
+        this.addBackListener()
       } catch (e) {
         this.streamError = e.message || 'Chyba načítání streamu'
       } finally {
         this.streamLoading = false
       }
     },
-    closeVideo() {
+    async closeVideo() {
+      this.removeBackListener()
+      try {
+        await AbsAudioPlayer.hideVideoPlayer()
+        await AbsAudioPlayer.closePlayback()
+      } catch (_) {}
+      this.clearVideo()
       this.activeVideo = null
-      this.streamUrl = null
       this.streamError = null
+    },
+    addBackListener() {
+      this.removeBackListener()
+      App.addListener('backButton', () => this.closeVideo()).then((handle) => {
+        this.backButtonListener = handle
+      })
+    },
+    removeBackListener() {
+      if (this.backButtonListener) {
+        this.backButtonListener.remove()
+        this.backButtonListener = null
+      }
+    },
+    async downloadVideoFile(video) {
+      if (this.downloadingId) return
+      this.downloadingId = video.id
+      try {
+        const { url } = await this.getDownloadUrl(video.id)
+        await AbsAudioPlayer.downloadVideo({ url, title: video.title })
+        this.$toast.success('Stahování spuštěno', { timeout: 2000 })
+      } catch (e) {
+        this.$toast.error('Nepodařilo se stáhnout video')
+      } finally {
+        this.downloadingId = null
+      }
     },
     formatDuration(seconds) {
       if (!seconds) return ''

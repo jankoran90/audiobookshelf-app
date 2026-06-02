@@ -143,6 +143,42 @@ class LocalStorage {
     }
   }
 
+  async setRemoteUiUrl(url) {
+    try {
+      await Preferences.set({ key: 'remoteUiUrl', value: url || '' })
+    } catch (error) {
+      console.error('[LocalStorage] Failed to set remote UI URL', error)
+    }
+  }
+
+  async getRemoteUiUrl() {
+    try {
+      var obj = await Preferences.get({ key: 'remoteUiUrl' }) || {}
+      return obj.value || ''
+    } catch (error) {
+      console.error('[LocalStorage] Failed to get remote UI URL', error)
+      return ''
+    }
+  }
+
+  async setRemoteUiEnabled(val) {
+    try {
+      await Preferences.set({ key: 'remoteUiEnabled', value: val ? '1' : '0' })
+    } catch (error) {
+      console.error('[LocalStorage] Failed to set remote UI enabled', error)
+    }
+  }
+
+  async getRemoteUiEnabled() {
+    try {
+      var obj = await Preferences.get({ key: 'remoteUiEnabled' }) || {}
+      return obj.value === '1'
+    } catch (error) {
+      console.error('[LocalStorage] Failed to get remote UI enabled', error)
+      return false
+    }
+  }
+
   async setLanguage(lang) {
     try {
       await Preferences.set({ key: 'lang', value: lang })

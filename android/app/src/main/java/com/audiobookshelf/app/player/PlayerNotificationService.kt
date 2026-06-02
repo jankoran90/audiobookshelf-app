@@ -772,6 +772,30 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     }
   }
 
+  fun prepareStreamUrl(url: String, title: String) {
+    if (!isStarted) {
+      Intent(ctx, PlayerNotificationService::class.java).also {
+        ContextCompat.startForegroundService(ctx, it)
+      }
+    }
+    isClosed = false
+    val dataSourceFactory = DefaultHttpDataSource.Factory()
+    val mediaItem = MediaItem.fromUri(url)
+    val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
+    mPlayer.stop()
+    mPlayer.setMediaSource(mediaSource)
+    mPlayer.prepare()
+    mPlayer.playWhenReady = true
+  }
+
+  fun attachVideoSurface(tv: android.view.TextureView) {
+    mPlayer.setVideoTextureView(tv)
+  }
+
+  fun detachVideoSurface(tv: android.view.TextureView) {
+    mPlayer.clearVideoTextureView(tv)
+  }
+
   fun getCurrentTime(): Long {
     return currentPlayer.currentPosition + getCurrentTrackStartOffsetMs()
   }

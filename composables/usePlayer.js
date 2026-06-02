@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { AbsAudioPlayer } from '@/plugins/capacitor'
 
 // Singleton — stav přehrávače sdílený napříč komponentami
 const isPlaying = ref(false)
@@ -46,12 +47,12 @@ export function usePlayer() {
     // AbsAudioPlayer.setVolume(val)
   }
 
-  // YouTube / URL-based playback — Fáze 3 zapojí AbsAudioPlayer.prepareStream()
-  function playUrl(url, meta = {}) {
+  async function playUrl(url, meta = {}) {
     isVideoItem.value = meta.isVideo || false
     currentVideoUrl.value = url
     currentVideoMeta.value = meta
     if (meta.duration) totalDuration.value = meta.duration
+    await AbsAudioPlayer.prepareStream({ url, title: meta.title || '', isVideo: meta.isVideo || false })
   }
 
   function clearVideo() {
