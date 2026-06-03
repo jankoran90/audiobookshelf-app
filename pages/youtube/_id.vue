@@ -83,7 +83,7 @@
 </template>
 
 <script>
-import { App } from '@capacitor/core'
+import { App } from '@capacitor/app'
 import { AbsAudioPlayer } from '@/plugins/capacitor'
 import { useYouTube } from '@/composables/useYouTube'
 import { usePlayer } from '@/composables/usePlayer'

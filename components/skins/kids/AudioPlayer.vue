@@ -1,4 +1,5 @@
 <template>
+  <div class="contents">
   <div v-if="isOpen" class="fixed inset-0 z-30 flex flex-col" :style="{ background: coverBg }">
     <!-- Cover art -->
     <div class="flex-1 flex items-center justify-center px-8 pt-8">
@@ -54,6 +55,7 @@
     <button class="w-12 h-12 flex items-center justify-center" @click.stop="playPause">
       <span class="material-symbols text-4xl text-fg">{{ isPlaying ? 'pause' : 'play_arrow' }}</span>
     </button>
+  </div>
   </div>
 </template>
 
