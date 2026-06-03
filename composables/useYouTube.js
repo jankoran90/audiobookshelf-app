@@ -7,16 +7,18 @@ const ANTENNA = 'https://antenna.jankoran.cz'
 const INNERTUBE_URL = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false'
 const INNERTUBE_HEADERS = {
   'Content-Type': 'application/json',
-  'User-Agent': 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
+  'User-Agent': 'com.google.android.youtube/19.44.41 (Linux; U; Android 11) gzip',
   'X-YouTube-Client-Name': '3',
-  'X-YouTube-Client-Version': '19.09.37',
+  'X-YouTube-Client-Version': '19.44.41',
 }
 const INNERTUBE_CONTEXT = {
   client: {
     clientName: 'ANDROID',
-    clientVersion: '19.09.37',
+    clientVersion: '19.44.41',
     androidSdkVersion: 30,
     platform: 'MOBILE',
+    hl: 'cs',
+    gl: 'CZ',
   },
 }
 
@@ -54,15 +56,24 @@ export function useYouTube() {
       connectTimeout: 10000,
       readTimeout: 30000,
     })
-    if (response.status !== 200) throw new Error('InnerTube chyba')
+
+    if (response.status !== 200) {
+      const reason = response.data?.error?.message || response.data?.playabilityStatus?.reason || `HTTP ${response.status}`
+      throw new Error(`InnerTube: ${reason}`)
+    }
+
     const data = response.data
+    const playStatus = data.playabilityStatus?.status
+    if (playStatus && playStatus !== 'OK') {
+      throw new Error(`Video nedostupné: ${data.playabilityStatus?.reason || playStatus}`)
+    }
 
     // Kombinované formáty (audio+video v jednom streamu, max 720p) — přímé přehrávání
     const formats = (data.streamingData?.formats || [])
       .filter((f) => f.url && f.mimeType?.startsWith('video'))
       .sort((a, b) => (b.height || 0) - (a.height || 0))
 
-    if (!formats.length) throw new Error('Žádná stream URL nenalezena')
+    if (!formats.length) throw new Error('Žádné přehratelné formáty — video možná není k dispozici v CZ')
 
     return {
       url: formats[0].url,
@@ -82,7 +93,10 @@ export function useYouTube() {
       connectTimeout: 10000,
       readTimeout: 30000,
     })
-    if (response.status !== 200) throw new Error('InnerTube chyba')
+    if (response.status !== 200) {
+      const reason = response.data?.error?.message || `HTTP ${response.status}`
+      throw new Error(`InnerTube: ${reason}`)
+    }
     const data = response.data
 
     const formats = (data.streamingData?.formats || [])
