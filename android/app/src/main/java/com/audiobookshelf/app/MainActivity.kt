@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
 import android.view.TextureView
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.webkit.WebView
@@ -59,11 +60,18 @@ class MainActivity : BridgeActivity() {
     super.onCreate(savedInstanceState)
     Log.d(tag, "onCreate")
 
-    // Update the margins to handle edge-to-edge enforced in SDK 35
-    // See: https://developer.android.com/develop/ui/views/layout/edge-to-edge
-    videoSurface = findViewById(R.id.videoSurface)
+    // BridgeActivity uses its own layout (capacitor_bridge_layout_main), not activity_main.xml.
+    // We must add the TextureView programmatically to Capacitor's root layout.
+    videoSurface = TextureView(this).apply {
+      visibility = View.GONE
+      elevation = 4f * resources.displayMetrics.density
+    }
+    (bridge.webView.parent as ViewGroup).addView(
+      videoSurface,
+      ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+    )
 
-    val webView: WebView = findViewById(R.id.webview)
+    val webView: WebView = bridge.webView
     webView.setOnApplyWindowInsetsListener { v, insets ->
       val (left, top, right, bottom) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         val sysInsets = insets.getInsets(WindowInsets.Type.systemBars())
